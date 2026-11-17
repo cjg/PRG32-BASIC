@@ -7,6 +7,7 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 # source files for the BASIC interpreter core
 set(BASIC_CORE_SOURCES
         src/arena.c
+        src/lexer.c
         src/strpool.c
 )
 
