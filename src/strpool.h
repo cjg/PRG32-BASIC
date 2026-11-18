@@ -15,10 +15,14 @@
 
 #include <stdint.h>
 
+#include "symbol_table.h"
+
 //
 // @brief Initializes the string pool subsystem, resetting active banks and roots.
 //
-void strpool_init(void);
+// @param symbol_table Table of registered variables
+//
+void strpool_init(symbol_table_t *symbol_table);
 
 //
 // @brief Allocates space for a dynamic string in the active string bank.

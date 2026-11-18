@@ -8,10 +8,11 @@
 #ifndef PRG32_BASIC_BASIC_RT_H
 #define PRG32_BASIC_BASIC_RT_H
 
-#define BASIC_ARENA_SIZE     (16 * 1024)  // 16 KB static AST arena
-#define BASIC_STR_BANK_SIZE  1024         // 1 KB per bank
-#define BASIC_MAX_ROOTS      8            // temporary expression root stack size
-#define BASIC_MAX_VARS       64           // max variable symbol slots
+#define BASIC_ARENA_SIZE       (16 * 1024)  // 16 KB static AST arena
+#define BASIC_STR_BANK_SIZE    1024         // 1 KB per bank
+#define BASIC_MAX_ROOTS        8            // temporary expression root stack size
+#define BASIC_MAX_VARS         64           // max variable symbol slots
+#define BASIC_MAX_VAR_NAME_LEN 64
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -44,5 +45,13 @@ typedef struct {
     string_val_t str_val;
   } data;
 } runtime_val_t;
+
+//
+// @brief AST node type classifications
+//
+typedef enum {
+  NODE_ASSIGN = 0,
+  NODE_PRINT,
+} node_type_t;
 
 #endif //PRG32_BASIC_BASIC_RT_H

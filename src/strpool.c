@@ -18,13 +18,13 @@ static uint16_t str_offset = 0;
 // temporary expression root stack to protect intermediate pointers during GC
 static string_val_t* temp_roots[BASIC_MAX_ROOTS];
 static uint8_t temp_root_top = 0;
+static symbol_table_t* _symbol_table;
 
-runtime_val_t vars[BASIC_MAX_VARS];
-
-void strpool_init(void) {
+void strpool_init(symbol_table_t *symbol_table) {
   active_bank = 0;
   str_offset = 0;
   temp_root_top = 0;
+  _symbol_table = symbol_table;
   memset(str_banks, 0, sizeof(str_banks));
 }
 
@@ -68,8 +68,8 @@ void strpool_gc(void) {
 
   // mark and sweep across all 64 variable slots
   for (int i = 0; i < BASIC_MAX_VARS; i++) {
-    if (vars[i].type == VAL_STR) {
-      relocate_string(&vars[i].data.str_val, target_bank, &target_offset);
+    if (_symbol_table->symbols[i].active && _symbol_table->symbols[i].val.type == VAL_STR) {
+      relocate_string(&_symbol_table->symbols[i].val.data.str_val, target_bank, &target_offset);
     }
   }
 

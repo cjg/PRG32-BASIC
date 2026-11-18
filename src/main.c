@@ -7,7 +7,7 @@
 
 #include "arena.h"
 #include "strpool.h"
-#include "lexer.h"
+#include "parser.h"
 
 static void read_whole_file(char **content, size_t *length, const char *filename);
 
@@ -16,19 +16,21 @@ int main(int argc, char **argv) {
     fprintf(stderr, "Usage: %s filename\n", argv[0]);
     exit(1);
   }
+  symbol_table_t symbol_table;
+  symbol_table_init(&symbol_table);
   arena_reset();
-  strpool_init();
+  strpool_init(&symbol_table);
   char *source = NULL;
   size_t length = 0;
   read_whole_file(&source, &length, argv[1]);
-  lexer_t lexer;
-  lexer_init(&lexer, source, length);
-  for (;;) {
-    token_t token = lexer_next(&lexer);
-    if (token.type == TOKEN_EOF) {
-      break;
-    }
-    printf("token type %d\n", token.type);
+  ast_node_t *root = parser_parse(source, length, &symbol_table);
+  if (root == NULL) {
+    fprintf(stderr, "Could not parse file\n");
+    exit(1);
+  }
+  while (root != NULL) {
+    printf("Type: %d Line: %d\n", root->type, root->line_number);
+    root = root->next;
   }
 }
 

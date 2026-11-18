@@ -8,7 +8,10 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 set(BASIC_CORE_SOURCES
         src/arena.c
         src/lexer.c
+        src/logging.c
+        src/parser.c
         src/strpool.c
+        src/symbol_table.c
 )
 
 # desktop Host Executable Launcher
