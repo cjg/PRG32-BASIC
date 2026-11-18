@@ -87,19 +87,17 @@ void strpool_gc(void) {
 
 const char* strpool_alloc(const char* src, uint16_t len) {
   // if allocation exceeds bank capacity, trigger garbage collection
-  if (str_offset + len + 1 > BASIC_STR_BANK_SIZE) {
+  if (str_offset + len > BASIC_STR_BANK_SIZE) {
     strpool_gc();
     // if still exceeding after GC, return NULL (out of memory error)
-    if (str_offset + len + 1> BASIC_STR_BANK_SIZE) {
+    if (str_offset + len > BASIC_STR_BANK_SIZE) {
       return NULL;
     }
   }
 
   char* dest = &str_banks[active_bank][str_offset];
   memcpy(dest, src, len);
-  // ensuring properly terminated strings
-  dest[len] = '\0';
-  str_offset += len + 1;
+  str_offset += len;
 
   return dest;
 }

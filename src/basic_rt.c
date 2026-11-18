@@ -65,6 +65,7 @@ static ast_node_t *advance_pc(ast_node_t *cur) {
 
   // otherwise, walk upward through parent containers
   ast_node_t *p = cur->parent;
+  DPRINTF("Parent of %p (%u) is %p", cur, cur->line_number, p);
   while (p) {
     // TODO: handle loops and branches
     p = p->parent;
@@ -129,6 +130,8 @@ void basic_update() {
   }
 }
 
+static char print_buffer[120] = {0};
+
 void basic_draw() {
   static bool error_printed = false;
   if (has_error) {
@@ -156,7 +159,13 @@ void basic_draw() {
           return;
         }
         // TODO: improve print
-        printf("%s\n", val.data.str_val.ptr);
+        uint16_t len = val.data.str_val.len;
+        if (len >= sizeof(print_buffer)) {
+          len = sizeof(print_buffer) - 1;
+        }
+        memcpy(print_buffer, val.data.str_val.ptr, len);
+        print_buffer[len] = '\0';
+        printf("%s\n", print_buffer);
       }
         break;
       case NODE_ASSIGN:
