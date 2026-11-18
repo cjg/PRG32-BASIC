@@ -183,5 +183,6 @@ ast_node_t* parser_parse(const char* src, size_t len, symbol_table_t* symbol_tab
 
   // TODO: validate AST
 
+  head_dummy.next->parent = NULL;
   return head_dummy.next;
 }
