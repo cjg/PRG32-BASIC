@@ -8,11 +8,15 @@
 #ifndef PRG32_BASIC_BASIC_RT_H
 #define PRG32_BASIC_BASIC_RT_H
 
+#define BASIC_SCRIPT_SIZE      (16 * 1024)  // 16 KB script size
 #define BASIC_ARENA_SIZE       (16 * 1024)  // 16 KB static AST arena
 #define BASIC_STR_BANK_SIZE    1024         // 1 KB per bank
 #define BASIC_MAX_ROOTS        8            // temporary expression root stack size
 #define BASIC_MAX_VARS         64           // max variable symbol slots
-#define BASIC_MAX_VAR_NAME_LEN 64
+#define BASIC_MAX_VAR_NAME_LEN 64           // max length for variable names
+#define BASIC_MAX_STEPS        2000         // max AST node steps per frame before yielding
+
+extern char basic_script[BASIC_SCRIPT_SIZE];
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -53,5 +57,23 @@ typedef enum {
   NODE_ASSIGN = 0,
   NODE_PRINT,
 } node_type_t;
+
+//
+// @brief Initialize the basic runtime
+//
+void basic_init();
+
+//
+// @brief Executes script logic steps during PRG32's update() callback.
+// Automatically yields and switches phase when a graphic statement or delay is hit.
+//
+void basic_update();
+
+//
+// @brief Executes graphics and neutral control flow steps during PRG32's draw() callback.
+// Automatically yields back to update phase when a logic mutation statement is hit.
+//
+void basic_draw();
+
 
 #endif //PRG32_BASIC_BASIC_RT_H
