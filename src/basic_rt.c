@@ -95,7 +95,6 @@ void basic_init() {
 void basic_update() {
   if (has_error || !pc) {
     DPRINTF("Script completed");
-    sleep(5);
     // error or script completed
     return;
   }
@@ -137,7 +136,7 @@ void basic_draw() {
   if (has_error) {
     // FIXME: render error properly
     if (!error_printed) {
-      fprintf(stderr, "RUNTIME ERROR AT LINE %d\n", error_line);
+      // fprintf(stderr, "RUNTIME ERROR AT LINE %d\n", error_line);
       error_printed = true;
     }
     return;

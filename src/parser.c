@@ -8,6 +8,8 @@
 #include "lexer.h"
 #include "logging.h"
 
+#include <stdlib.h>
+
 // parser context tracking lexer state and lookahead token
 typedef struct {
   lexer_t lexer;
@@ -34,7 +36,7 @@ static expr_node_t* parse_primary(parser_ctx_t* parser) {
 
   if (parser->current.type == TOKEN_INT_LITERAL) {
     node->type = EXPR_INT_LITERAL;
-    node->data.int_val = (int32_t) strtol(parser->current.start, NULL, 10);
+    node->data.int_val = (int32_t) atoi(parser->current.start);
     parser_advance(parser);
     return node;
   }
@@ -168,7 +170,7 @@ ast_node_t* parser_parse(const char* src, size_t len, symbol_table_t* symbol_tab
     parse_statement_result_t result;
     parse_statement(&result, &parser, curr);
     if (result.has_error) {
-      fprintf(stderr, "Parsing statement error at line %d: %s\n", result.error.line, result.error.message);
+      // fprintf(stderr, "Parsing statement error at line %d: %s\n", result.error.line, result.error.message);
       break;
     }
     if (result.node) {

@@ -7,6 +7,8 @@
 
 #include <stdio.h>
 
+#define NDEBUG
+
 #ifndef NDEBUG
     #define DPRINTF(fmt, ...) \
         fprintf(stderr, "[DEBUG] %s:%d: " fmt "\n", __FILE__, __LINE__, ##__VA_ARGS__)

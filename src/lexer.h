@@ -6,6 +6,7 @@
 #define PRG32_BASIC_LEXER_H
 
 #include <stdlib.h>
+#include <stdint.h>
 
 //
 // @brief token classifications recognized by the lexer and parser
