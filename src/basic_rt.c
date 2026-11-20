@@ -4,16 +4,17 @@
 
 #include "basic_rt.h"
 
+#include <prg32.h>
+
 #include <string.h>
 #include <stdio.h>
-#include <unistd.h>
 
 #include "arena.h"
 #include "strpool.h"
 #include "parser.h"
 #include "logging.h"
 
-char basic_script[BASIC_SCRIPT_SIZE];
+char basic_script[BASIC_SCRIPT_SIZE] = "PRINT \"Hello World!\"";
 
 // global interpreter execution state residing strictly in .bss
 static ast_node_t *program_root = NULL;
@@ -76,6 +77,8 @@ static ast_node_t *advance_pc(ast_node_t *cur) {
 }
 
 void basic_init() {
+  prg32_console_write("-- PRG32 BASIC --\n\n");
+
   // initialize memory arena and symbol table
   arena_reset();
   symbol_table_init(&symbol_table);
@@ -93,8 +96,12 @@ void basic_init() {
 }
 
 void basic_update() {
+  static bool completed_communicated = false;
   if (has_error || !pc) {
-    DPRINTF("Script completed");
+    if (!completed_communicated) {
+      prg32_console_write("\n\n-- SCRIPT COMPLETED --\n");
+      completed_communicated = true;
+    }
     // error or script completed
     return;
   }
@@ -164,7 +171,7 @@ void basic_draw() {
         }
         memcpy(print_buffer, val.data.str_val.ptr, len);
         print_buffer[len] = '\0';
-        printf("%s\n", print_buffer);
+        prg32_console_write(print_buffer);
       }
         break;
       case NODE_ASSIGN:

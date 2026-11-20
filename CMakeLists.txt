@@ -49,4 +49,19 @@ add_executable(prg32-basic
         src/stdlib.c
 )
 
-target_include_directories(prg32-basic PRIVATE src ${PRG32_HOME}/components/prg32/include)
+target_include_directories(prg32-basic PRIVATE src ${PRG32_HOME}/components/prg32/include ${PRG32_HOME}/components/prg32_audio/include)
+
+add_custom_command(
+        OUTPUT ${PROJECT_BINARY_DIR}/basic.prg32
+        DEPENDS hacks/build-cartridge.py prg32-basic
+        COMMAND ${PYTHON_EXE} -u ${PROJECT_SOURCE_DIR}/hacks/build-cartridge.py ${PROJECT_SOURCE_DIR} ${PROJECT_BINARY_DIR}
+)
+
+add_custom_target(cartridge
+    DEPENDS ${PROJECT_BINARY_DIR}/basic.prg32
+)
+
+add_custom_target(upload-cartridge
+        DEPENDS ${PROJECT_BINARY_DIR}/basic.prg32
+        COMMAND ${PYTHON_EXE} -u ${PROJECT_SOURCE_DIR}/hacks/upload-cartridge.py ${PROJECT_BINARY_DIR}
+)
