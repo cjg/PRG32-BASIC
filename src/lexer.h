@@ -25,6 +25,11 @@ typedef enum {
 
   /* Operators & Delimiters */
   TOKEN_ASSIGN,        /* = */
+  TOKEN_PLUS,          /* + */
+  TOKEN_MINUS,         /* - */
+  TOKEN_ASTERISK,      /* * */
+  TOKEN_SLASH,         /* / */
+  TOKEN_MOD,           /* % */
 
   TOKEN_UNKNOWN
 } token_type_t;

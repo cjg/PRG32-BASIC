@@ -51,6 +51,27 @@ typedef struct {
 } runtime_val_t;
 
 //
+// @brief Indicate if the execution of a statement or the evaluation of an expression is successful
+//
+typedef struct {
+  bool has_error;
+  uint32_t line_number;
+  const char *error_msg;
+} runtime_result_t;
+
+#define RUNTIME_ERR(node, msg) (runtime_result_t) { .has_error = true, .line_number = (node)->line_number, .error_msg = (msg) }
+#define RUNTIME_OK() (runtime_result_t) { .has_error = false, .error_msg = NULL }
+
+#define CHECK_RUNTIME_ERR(statement) \
+  do { \
+    runtime_result_t __result; \
+    __result = statement; \
+    if (__result.has_error) { \
+      return __result; \
+    } \
+  } while(0)
+
+//
 // @brief AST node type classifications
 //
 typedef enum {

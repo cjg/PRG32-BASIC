@@ -1,0 +1,5 @@
+PRINT 1 + 1
+PRINT 1 - 1
+PRINT 2 * 2
+PRINT 6 / 2
+PRINT 6 / 4

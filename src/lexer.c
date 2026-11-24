@@ -120,6 +120,11 @@ token_t lexer_next(lexer_t *l) {
         l->pos++;
         switch (c) {
             case '=': return (token_t){ .type = TOKEN_ASSIGN, .start = start_ptr, .length = 1, .line = current_line };
+            case '+': return (token_t){.type = TOKEN_PLUS, .start = start_ptr, .length = 1, .line = current_line };
+            case '-': return (token_t){.type = TOKEN_MINUS, .start = start_ptr, .length = 1, .line = current_line };
+            case '*': return (token_t){.type = TOKEN_ASTERISK, .start = start_ptr, .length = 1, .line = current_line };
+            case '/': return (token_t){.type = TOKEN_SLASH, .start = start_ptr, .length = 1, .line = current_line };
+            case '%': return (token_t){.type = TOKEN_MOD, .start = start_ptr, .length = 1, .line = current_line };
             default:  return (token_t){ .type = TOKEN_UNKNOWN, .start = start_ptr, .length = 1, .line = current_line };
         }
     }

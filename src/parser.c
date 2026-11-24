@@ -4,6 +4,8 @@
 
 #include "parser.h"
 
+#include <assert.h>
+
 #include "arena.h"
 #include "lexer.h"
 #include "logging.h"
@@ -66,11 +68,27 @@ static expr_node_t* parse_primary(parser_ctx_t* parser) {
 }
 
 /**
- * @brief Pratt parsing expression precedence router (placeholder simplified for skeleton).
+ * @brief Pratt parsing expression precedence router
  */
 static expr_node_t* parse_expression(parser_ctx_t* parser) {
   /* Simplified recursive descent expression parser for binary ops */
   expr_node_t* left = parse_primary(parser);
+
+  while (parser->current.type == TOKEN_PLUS || parser->current.type == TOKEN_MINUS ||
+           parser->current.type == TOKEN_ASTERISK || parser->current.type == TOKEN_SLASH ||
+           parser->current.type == TOKEN_MOD) {
+
+    token_t op_token = parser->current;
+    parser_advance(parser);
+
+    expr_node_t *right = parse_primary(parser);
+    expr_node_t *bin_node = (expr_node_t *)arena_alloc(sizeof(expr_node_t));
+    bin_node->type = EXPR_BINARY;
+    bin_node->data.binary.op = op_token.type;
+    bin_node->data.binary.left = left;
+    bin_node->data.binary.right = right;
+    left = bin_node;
+           }
 
   return left;
 }
@@ -90,17 +108,19 @@ typedef struct {
 // @brief Parses an individual statement node.
 //
 static void parse_statement(parse_statement_result_t *result, parser_ctx_t* parser, ast_node_t* parent) {
-  DPRINTF("Current token type: %d\n", parser->current.type);
+  assert(result != NULL);
+
+  DEBUG("Current token type: %d\n", parser->current.type);
   // skip newlines
   while (parser->current.type == TOKEN_NEWLINE) {
-    DPRINTF("Advancing NL");
+    DEBUG("Advancing NL");
     parser_advance(parser);
   }
 
   // reached end of file
   if (parser->current.type == TOKEN_EOF) {
     result->has_error = false;
-    DPRINTF("End of file");
+    DEBUG("End of file");
     return;
   }
 
@@ -134,21 +154,17 @@ static void parse_statement(parse_statement_result_t *result, parser_ctx_t* pars
 
   // PRINT statement
   if (parser->current.type == TOKEN_KW_PRINT) {
-    // this is a PRINT expected string after PRINT keyword
-    if (parser->peek_token.type != TOKEN_IDENTIFIER && parser->peek_token.type != TOKEN_STR_LITERAL) {
-      result->has_error = true;
-      result->error.line = parser->current.line;
-      result->error.message = "expected identifier or string literal after PRINT keyword";
-      return;
-    }
     result->node->type = NODE_PRINT;
     parser_advance(parser);
     result->node->data.print_stmt.expr = parse_expression(parser);
     return;
   }
 
+  result->has_error = true;
+  result->error.line = parser->current.line;
+  result->error.message = "unexpected token";
   // skip unknown tokens to prevent infinite loops
-  DPRINTF("Unexpected token %d '%s'", parser->current.type, parser->current.start);
+  DEBUG("Unexpected token %d '%s'", parser->current.type, parser->current.start);
   parser_advance(parser);
 }
 
@@ -166,21 +182,18 @@ ast_node_t* parser_parse(const char* src, size_t len, symbol_table_t* symbol_tab
   ast_node_t* curr = &head_dummy;
 
   while (parser.current.type != TOKEN_EOF && !parser.has_error) {
-    DPRINTF("Parsing statement %s\n", parser.current.start);
+    DEBUG("Parsing statement %s\n", parser.current.start);
     parse_statement_result_t result;
     parse_statement(&result, &parser, curr);
     if (result.has_error) {
       // fprintf(stderr, "Parsing statement error at line %d: %s\n", result.error.line, result.error.message);
-      break;
+      return NULL;
     }
-    if (result.node) {
-      DPRINTF("Parsed statement type %d\n", result.node->type);
+    assert(result.node != NULL);
+      DEBUG("Parsed statement type %d\n", result.node->type);
       curr->next = result.node;
       curr = result.node;
       result.node->next = NULL;
-    } else {
-      DPRINTF("Error parsing statement\n");
-    }
   }
 
   // TODO: validate AST

@@ -32,6 +32,7 @@ typedef struct expr_node {
     EXPR_UNARY,
     EXPR_CALL
 } type;
+  uint32_t line_number;
   union {
     int32_t int_val;
     string_val_t str_val;

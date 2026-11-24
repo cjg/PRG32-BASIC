@@ -5,8 +5,12 @@
 #include "basic_rt.h"
 
 #include <ctype.h>
+#if defined(PRG32_BASIC_DEBUG)
+#else
 #include <prg32.h>
+#endif
 
+#include <assert.h>
 #include <string.h>
 #include <stdio.h>
 
@@ -15,6 +19,8 @@
 #include "parser.h"
 #include "logging.h"
 #include "mini_ctype.h"
+#include "expression.h"
+#include "console.h"
 
 char basic_script[BASIC_SCRIPT_SIZE] = {0};
 
@@ -22,36 +28,27 @@ char basic_script[BASIC_SCRIPT_SIZE] = {0};
 static ast_node_t *program_root = NULL;
 static ast_node_t *pc = NULL;
 static bool in_draw_phase = false;
-static bool has_error = false;
-static uint32_t error_line = 0;
 static symbol_table_t symbol_table;
 static bool interactive = true;
 
-//
-// @brief Evaluates an expression node recursively with safety checks.
-//
-static bool eval_expression(expr_node_t *expr, runtime_val_t *out_val) {
-    if (!expr) return false;
 
-    switch (expr->type) {
-        case EXPR_INT_LITERAL:
-            out_val->type = VAL_INT;
-            out_val->data.int_val = expr->data.int_val;
-            return true;
+// error handling
+static bool has_error = false;
+static uint32_t error_line = 0;
+static const char *error_msg = NULL;
 
-        case EXPR_STR_LITERAL:
-            out_val->type = VAL_STR;
-            out_val->data.str_val = expr->data.str_val;
-            return true;
+#define HANDLE_RUNTIME_ERR(statement) \
+  do { \
+    runtime_result_t __result; \
+    __result = (statement); \
+    if (__result.has_error) { \
+      has_error = true; \
+      error_line = __result.line_number; \
+      error_msg = __result.error_msg; \
+    } \
+  } while(0)
 
-        case EXPR_VARIABLE:
-            *out_val = symbol_table.symbols[expr->data.var_slot].val;
-            return true;
-
-        default:
-            return false;
-    }
-}
+static const runtime_result_t RUNTIME_OK = (runtime_result_t){false, 0};
 
 //
 // @brief Stackless AST advance logic using parent pointers.
@@ -69,7 +66,7 @@ static ast_node_t *advance_pc(ast_node_t *cur) {
 
   // otherwise, walk upward through parent containers
   ast_node_t *p = cur->parent;
-  DPRINTF("Parent of %p (%u) is %p", cur, cur->line_number, p);
+  DEBUG("Parent of %p (%u) is %p", cur, cur->line_number, p);
   while (p) {
     // TODO: handle loops and branches
     p = p->parent;
@@ -80,12 +77,20 @@ static ast_node_t *advance_pc(ast_node_t *cur) {
 }
 
 void basic_init() {
-  int8_t fd = prg32_fs_open("HELLO.BAS", "w");
-  prg32_fs_write(fd, "PRINT \"HELLO WORLD!\"", 21);
-  prg32_fs_write(fd, "\n", 2);
-  prg32_fs_close(fd);
-  prg32_console_write("-- PRG32 BASIC --\n\n");
   interactive = true;
+#ifdef PRG32_BASIC_DEBUG
+  arena_reset();
+  symbol_table_init(&symbol_table);
+  strpool_init(&symbol_table);
+
+  // parse script
+  program_root = parser_parse(basic_script, strlen(basic_script), &symbol_table);
+  if (!program_root) {
+    fprintf(stderr, "SYNTAX ERROR\n");
+    exit(1);
+  }
+  pc = program_root;
+#endif
 }
 
 static bool start_prompt = true;
@@ -97,6 +102,7 @@ static uint8_t command_len = 0;
 static const char *interactive_error = NULL;
 static bool print_script = false;
 
+#ifndef PRG32_BASIC_DEBUG
 static const char *read_script(const char *filename) {
   // skip spaces
   while (*filename != '\0' && *filename == ' ') {
@@ -105,6 +111,7 @@ static const char *read_script(const char *filename) {
   if (*filename == '\0') {
     return "FILE NOT PROVIDED";
   }
+
   int8_t fd = prg32_fs_open(filename, "r");
   if (fd < 0) {
     return "ERROR OPENING FILE";
@@ -191,54 +198,52 @@ static void interactive_update() {
   }
 }
 
-static void console_write_int(int32_t value) {
-  if (value == 0) {
-    prg32_console_putc('0');
-    return;
-  }
-  if (value < 0) {
-    prg32_console_putc('-');
-    value = -value;
-  }
 
-  char buffer[10] = {0};
-  uint16_t len = 0;
-
-  while (value > 0) {
-    buffer[len++] = '0' + (value % 10);
-    value /= 10;
-  }
-
-  while (len > 0) {
-    prg32_console_putc(buffer[len - 1]);
-    len--;
-  }
-}
 
 static void do_print_script() {
   prg32_console_putc('\n');
   uint16_t line_number = 1;
   const char *ptr = basic_script;
+  char buffer[41] = {0};
+  uint16_t len = 0;
   while (*ptr != 0) {
+    len = 0;
     // print line_number
     if (line_number < 100) {
-      prg32_console_write("  ");
-    } else if (line_number < 10) {
       prg32_console_putc(' ');
     }
-    console_write_int((int) line_number);
+    if (line_number < 10) {
+      prg32_console_putc(' ');
+    }
+    console_print_int((int) line_number);
     line_number++;
     prg32_console_write("| ");
-    while (*ptr != 0 && *ptr != '\n') {
-      prg32_console_putc(*ptr);
+    while (*ptr != 0) {
+      buffer[len++] = *ptr;
+      if (len == sizeof(buffer) - 1) {
+        buffer[len] = 0;
+        prg32_console_write(buffer);
+        len = 0;
+      }
+      bool newline = *ptr == '\n';
       ptr++;
+      if (newline) {
+        break;
+      }
     }
-    if (*ptr == '\n') {
-      prg32_console_putc('\n');
-      ptr++;
+    if (len > 0) {
+      buffer[len] = 0;
+      prg32_console_write(buffer);
+    }
+    if (*ptr != 0 && line_number % 20 == 0) {
+      prg32_console_write("\n-- PRESS A KEY TO CONTINUE --\n");
+      prg32_ps2kbd_read_key();
     }
   }
   prg32_console_putc('\n');
+  prg32_console_write("\n-- LINES ");
+  console_print_int((int) line_number);
+  prg32_console_write(" --\n");
 }
 
 static void interactive_draw() {
@@ -262,12 +267,17 @@ static void interactive_draw() {
     command_key = 0;
   }
 }
+#endif
+
 
 static void script_update() {
   static bool completed_communicated = false;
   if (has_error || !pc) {
     if (!completed_communicated) {
-      prg32_console_write("\n\n-- SCRIPT COMPLETED --\n\n");
+      console_print_string("\n-- SCRIPT COMPLETED --\n");
+#ifdef PRG32_BASIC_DEBUG
+      exit(0);
+#endif
       completed_communicated = true;
     }
     // error or script completed
@@ -281,20 +291,25 @@ static void script_update() {
   uint32_t steps = 0;
   // TODO: consider putting a timeout for yielding and avoid the watchdog trigger
   while (pc && steps < BASIC_MAX_STEPS) {
+    DEBUG("Executing statement at line %d", pc->line_number);
     steps++;
-    if (pc->type == NODE_PRINT) {
-      in_draw_phase = true;
-      // current instruction is a graphic statements, yielding to draw
-      return;
-    }
-
-    // execute the logic instruction
     switch (pc->type) {
+      case NODE_PRINT:
+        in_draw_phase = true;
+        DEBUG("Graphic statement, yielding to draw()");
+        return;
       case NODE_ASSIGN: {
         runtime_val_t val;
-        if (!eval_expression(pc->data.assign.expr, &val)) {
+        runtime_result_t result = eval_expression(pc->data.assign.expr, &val, symbol_table.symbols);
+        if (result.has_error) {
+          DEBUG("Error evaluating expression: %s", result.error_msg);
           has_error = true;
           error_line = pc->line_number;
+          interactive_error = result.error_msg;
+          return;
+        }
+        if (val.type == VAL_INT) {
+          DEBUG("Evaluated expression as INT: %d", val.data.int_val);
         }
         symbol_table.symbols[pc->data.assign.var_slot].val = val;
       }
@@ -314,12 +329,21 @@ static char print_buffer[120] = {0};
 static void script_draw() {
   static bool error_printed = false;
   if (has_error) {
+    console_print_string("\n!! RUNTIME ERROR AT LINE ");
+    console_print_int(error_line);
+    console_print_string(": ");
+    console_print_string(error_msg);
+    console_print_string("!!\n");
     // FIXME: render error properly
     if (!error_printed) {
       // fprintf(stderr, "RUNTIME ERROR AT LINE %d\n", error_line);
       error_printed = true;
     }
+#ifdef PRG32_BASIC_DEBUG
+    exit(2);
+#else
     return;
+#endif
   }
 
   if (!in_draw_phase || !pc) {
@@ -331,20 +355,25 @@ static void script_draw() {
     steps++;
     switch (pc->type) {
       case NODE_PRINT: {
+        DEBUG("Executing PRINT at line %d", pc->line_number);
         runtime_val_t val;
-        if (!eval_expression(pc->data.print_stmt.expr, &val)) {
-          has_error = true;
-          error_line = pc->line_number;
-          return;
+        HANDLE_RUNTIME_ERR(eval_expression(pc->data.print_stmt.expr, &val, symbol_table.symbols));
+        DEBUG("Evaluated expression in PRINT type: %d", val.type);
+        if (val.type == VAL_INT) {
+          console_print_int(val.data.int_val);
+          console_print_nl();
+        } else if (val.type == VAL_STR) {
+          uint16_t len = val.data.str_val.len;
+          if (len >= sizeof(print_buffer)) {
+            len = sizeof(print_buffer) - 1;
+          }
+          memcpy(print_buffer, val.data.str_val.ptr, len);
+          print_buffer[len] = '\0';
+          console_print_string(print_buffer);
+          console_print_nl();
+        } else {
+          HANDLE_RUNTIME_ERR(RUNTIME_ERR(pc, "INVALID VALUE TYPE FOR PRINT"));
         }
-        // TODO: improve print
-        uint16_t len = val.data.str_val.len;
-        if (len >= sizeof(print_buffer)) {
-          len = sizeof(print_buffer) - 1;
-        }
-        memcpy(print_buffer, val.data.str_val.ptr, len);
-        print_buffer[len] = '\0';
-        prg32_console_write(print_buffer);
       }
         break;
       case NODE_ASSIGN:
@@ -357,17 +386,25 @@ static void script_draw() {
 }
 
 void basic_update() {
+#ifndef PRG32_BASIC_DEBUG
   if (interactive) {
     interactive_update();
   } else {
     script_update();
   }
+#else
+  script_update();
+#endif
 }
 
 void basic_draw() {
+#ifndef PRG32_BASIC_DEBUG
   if (interactive) {
     interactive_draw();
   } else {
     script_draw();
   }
+#else
+  script_draw();
+#endif
 }
