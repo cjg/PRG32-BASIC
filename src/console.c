@@ -23,7 +23,7 @@ static void console_putc(char c) {
 
 void console_print_string(const char *str) {
 #ifdef PRG32_BASIC_DEBUG
-    printf("%s", str);
+    printf("%s\n", str);
     fflush(stdout);
 #else
     prg32_console_write(str);

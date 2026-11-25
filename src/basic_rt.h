@@ -77,6 +77,7 @@ typedef struct {
 typedef enum {
   NODE_ASSIGN = 0,
   NODE_PRINT,
+  NODE_WHILE
 } node_type_t;
 
 //

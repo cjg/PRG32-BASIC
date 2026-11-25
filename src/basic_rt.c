@@ -314,10 +314,35 @@ static void script_update() {
         symbol_table.symbols[pc->data.assign.var_slot].val = val;
       }
         break;
+      case NODE_WHILE: {
+        runtime_val_t cond;
+        runtime_result_t result = eval_expression(pc->data.while_stmt.cond, &cond, symbol_table.symbols);
+        if (result.has_error) {
+          DEBUG("Error evaluating expression: %s", result.error_msg);
+          has_error = true;
+          error_line = pc->line_number;
+          error_msg = result.error_msg;
+          return;
+        }
+        if (cond.type != VAL_INT) {
+          has_error = true;
+          error_line = pc->line_number;
+          error_msg = "WHILE CONDITION MUST BE AN INTEGER";
+        }
+        if (cond.data.int_val != 0) {
+          if (pc->data.while_stmt.body) {
+            pc = pc->data.while_stmt.body;
+            continue;
+          }
+        }
+        break;
+      }
       default:
+        DEBUG("Unexpected node type: %d", pc->type);
         // unexpected node type
         has_error = true;
         error_line = pc->line_number;
+        error_msg = "UNKNOWN STATEMENT";
         return;
     }
     pc = advance_pc(pc);
@@ -376,7 +401,7 @@ static void script_draw() {
         }
       }
         break;
-      case NODE_ASSIGN:
+      default:
         // switch to logic phase
         in_draw_phase = false;
         return;

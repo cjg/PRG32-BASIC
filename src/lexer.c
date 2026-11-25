@@ -22,8 +22,11 @@ static bool is_ident_char(char c)
 //
 static token_type_t get_keyword_type(const char *str, size_t len)
 {
-    if (len == 5) {
+    if (len == 3) {
+        if (strncasecmp(str, "END", 3) == 0) return TOKEN_KW_END;
+    } else if (len == 5) {
         if (strncasecmp(str, "PRINT", 5) == 0) return TOKEN_KW_PRINT;
+        if (strncasecmp(str, "WHILE", 5) == 0) return TOKEN_KW_WHILE;
     }
 
     return TOKEN_IDENTIFIER;
@@ -97,6 +100,29 @@ token_t lexer_next(lexer_t *l) {
                 .length = len,
                 .line = current_line
             };
+        }
+
+        // Two-character operators and symbols
+        if (c == '<') {
+            l->pos++;
+            if (l->pos < l->len && l->src[l->pos] == '>') {
+                l->pos++;
+                return (token_t){ .type = TOKEN_NEQ, .start = start_ptr, .length = 2, .line = current_line };
+            }
+            if (l->pos < l->len && l->src[l->pos] == '=') {
+                l->pos++;
+                return (token_t){ .type = TOKEN_LTE, .start = start_ptr, .length = 2, .line = current_line };
+            }
+            return (token_t){ .type = TOKEN_LT, .start = start_ptr, .length = 1, .line = current_line };
+        }
+
+        if (c == '>') {
+            l->pos++;
+            if (l->pos < l->len && l->src[l->pos] == '=') {
+                l->pos++;
+                return (token_t){ .type = TOKEN_GTE, .start = start_ptr, .length = 2, .line = current_line };
+            }
+            return (token_t){ .type = TOKEN_GT, .start = start_ptr, .length = 1, .line = current_line };
         }
 
         /* Identifiers and Keywords */

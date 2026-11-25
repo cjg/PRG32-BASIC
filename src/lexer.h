@@ -22,6 +22,8 @@ typedef enum {
 
   /* Keywords */
   TOKEN_KW_PRINT,
+  TOKEN_KW_WHILE,
+  TOKEN_KW_END,
 
   /* Operators & Delimiters */
   TOKEN_ASSIGN,        /* = */
@@ -30,6 +32,11 @@ typedef enum {
   TOKEN_ASTERISK,      /* * */
   TOKEN_SLASH,         /* / */
   TOKEN_MOD,           /* % */
+  TOKEN_LT,            /* < */
+  TOKEN_GT,            /* > */
+  TOKEN_LTE,           /* <= */
+  TOKEN_GTE,           /* >= */
+  TOKEN_NEQ,           /* <> or != */
 
   TOKEN_UNKNOWN
 } token_type_t;

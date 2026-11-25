@@ -69,6 +69,10 @@ struct ast_node {
     struct {
       expr_node_t *expr;
     } print_stmt;
+    struct {
+      expr_node_t *cond;
+      ast_node_t *body;
+    } while_stmt;
   } data;
 };
 
