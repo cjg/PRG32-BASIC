@@ -84,9 +84,10 @@ void basic_init() {
   strpool_init(&symbol_table);
 
   // parse script
-  program_root = parser_parse(basic_script, strlen(basic_script), &symbol_table);
-  if (!program_root) {
-    fprintf(stderr, "SYNTAX ERROR\n");
+  parser_result_t parser_result;
+  parser_parse(&parser_result, basic_script, strlen(basic_script), &symbol_table);
+  if (parser_result.has_error) {
+    fprintf(stderr, "SYNTAX ERROR LINE %d: %s\n", parser_result.error.line, parser_result.error.message);
     exit(1);
   }
   pc = program_root;
@@ -169,13 +170,15 @@ static void interactive_update() {
       strpool_init(&symbol_table);
 
       // parse script
-      program_root = parser_parse(basic_script, strlen(basic_script), &symbol_table);
-      if (!program_root) {
+      parser_result_t parser_result;
+      parser_parse(&parser_result, basic_script, strlen(basic_script), &symbol_table);
+      if (parser_result.has_error) {
         interactive_error = "SYNTAX ERROR";
         reading_command = true;
         start_prompt = true;
         return;
       } else {
+        program_root = parser_result.node;
         pc = program_root;
         interactive = false;
       }

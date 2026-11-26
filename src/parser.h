@@ -11,6 +11,7 @@
 #define PRG32_BASIC_PARSER_H
 
 #include "basic_rt.h"
+#include "lexer.h"
 #include "symbol_table.h"
 
 #include <stdlib.h>
@@ -76,14 +77,28 @@ struct ast_node {
   } data;
 };
 
+typedef struct {
+  uint32_t line;
+  const char *message;
+  token_type_t token_type;
+} parser_error_t;
+
+
+typedef struct {
+  bool has_error;
+  ast_node_t *node;
+  parser_error_t error;
+} parser_result_t;
+
 //
 // @brief Parses a token stream into an AST root node linked list.
 //
+// @param result Pointer to a parser_result_t struct, containing AST on success or error message
 // @param src Pointer to raw source buffer.
 // @param len Byte length of source buffer.
 // @param symbol_table Table of registered variables.
 // @return Pointer to the root AST node, or NULL if a syntax/validation error occurs.
 //
-ast_node_t *parser_parse(const char *src, size_t len, symbol_table_t *symbol_table);
+void parser_parse(parser_result_t *result, const char *src, size_t len, symbol_table_t *symbol_table);
 
 #endif //PRG32_BASIC_PARSER_H

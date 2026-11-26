@@ -37,6 +37,8 @@ typedef enum {
   TOKEN_LTE,           /* <= */
   TOKEN_GTE,           /* >= */
   TOKEN_NEQ,           /* <> or != */
+  TOKEN_LPAREN,        // (
+  TOKEN_RPAREN,        // )
 
   TOKEN_UNKNOWN
 } token_type_t;

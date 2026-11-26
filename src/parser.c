@@ -27,6 +27,7 @@ typedef struct {
 static void parser_advance(parser_ctx_t *parser) {
     parser->current = parser->peek_token;
     parser->peek_token = lexer_next(&parser->lexer);
+    DEBUG("Current lexer token type: %d", parser->current.type);
 }
 
 //
@@ -95,18 +96,6 @@ static expr_node_t *parse_expression(parser_ctx_t *parser) {
     return left;
 }
 
-typedef struct {
-    uint32_t line;
-    const char *message;
-    token_type_t token_type;
-} parser_error_t;
-
-typedef struct {
-    bool has_error;
-    ast_node_t *node;
-    parser_error_t error;
-} parse_statement_result_t;
-
 //
 // @brief Checks if current token matches expected type.
 //
@@ -121,7 +110,7 @@ static bool parser_match(parser_ctx_t *parser, token_type_t type) {
 //
 // @brief Parses an individual statement node.
 //
-static void parse_statement(parse_statement_result_t *result, parser_ctx_t *parser, ast_node_t *parent) {
+static void parse_statement(parser_result_t *result, parser_ctx_t *parser, ast_node_t *parent) {
     assert(result != NULL);
 
     DEBUG("Current token type: %d\n", parser->current.type);
@@ -189,7 +178,7 @@ static void parse_statement(parse_statement_result_t *result, parser_ctx_t *pars
         bool end_found = false;
         while (parser->current.type != TOKEN_KW_END && parser->current.type != TOKEN_EOF) {
             DEBUG("Parsing WHILE body, current type: %d", parser->current.type);
-            parse_statement_result_t res;
+            parser_result_t res;
             res.node = (ast_node_t *) arena_alloc(sizeof(ast_node_t));
             parse_statement(&res, parser, result->node);
             if (res.has_error) {
@@ -228,7 +217,7 @@ static void parse_statement(parse_statement_result_t *result, parser_ctx_t *pars
     parser_advance(parser);
 }
 
-ast_node_t *parser_parse(const char *src, size_t len, symbol_table_t *symbol_table) {
+void parser_parse(parser_result_t *result, const char *src, size_t len, symbol_table_t *symbol_table) {
     parser_ctx_t parser;
     parser.symbol_table = symbol_table;
     lexer_init(&parser.lexer, src, len);
@@ -243,21 +232,24 @@ ast_node_t *parser_parse(const char *src, size_t len, symbol_table_t *symbol_tab
 
     while (parser.current.type != TOKEN_EOF && !parser.has_error) {
         DEBUG("Parsing statement |%s|\n", parser.current.start);
-        parse_statement_result_t result;
-        parse_statement(&result, &parser, curr);
-        if (result.has_error) {
-            // fprintf(stderr, "Parsing statement error at line %d: %s\n", result.error.line, result.error.message);
-            return NULL;
+        parser_result_t statement_result;
+        parse_statement(&statement_result, &parser, curr);
+        if (statement_result.has_error) {
+            DEBUG("syntax error?!");
+            result->has_error = true;
+            result->error = statement_result.error;
+            return;
         }
-        assert(result.node != NULL);
-        DEBUG("Parsed statement type %d\n", result.node->type);
-        curr->next = result.node;
-        curr = result.node;
-        result.node->next = NULL;
+        assert(statement_result.node != NULL);
+        DEBUG("Parsed statement type %d\n", statement_result.node->type);
+        curr->next = statement_result.node;
+        curr = statement_result.node;
+        statement_result.node->next = NULL;
     }
 
     // TODO: validate AST
 
     head_dummy.next->parent = NULL;
-    return head_dummy.next;
+    result->has_error = false;
+    result->node = head_dummy.next;
 }
