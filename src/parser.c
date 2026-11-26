@@ -208,6 +208,11 @@ static void parse_statement(parser_result_t *result, parser_ctx_t *parser, ast_n
         return;
     }
 
+    // function call: identifier followed by left parenthesis
+    if (parser->current.type == TOKEN_IDENTIFIER && parser->peek_token.type == TOKEN_LPAREN) {
+        DEBUG("Parsing function call at %d", parser->current.line);
+    }
+
     result->has_error = true;
     result->error.line = parser->current.line;
     result->error.message = "unexpected token";
