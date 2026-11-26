@@ -17,7 +17,9 @@ set(SOURCE_FILES
         src/symbol_table.c
         src/stdlib.c
         src/expression.c
-        src/console.c)
+        src/console.c
+        src/builtin.c
+        src/builtin.h)
 
 if ("${BUILD_TYPE}" STREQUAL "cartridge")
     enable_language(C ASM)

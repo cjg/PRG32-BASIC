@@ -15,6 +15,7 @@
 #define BASIC_MAX_VARS         64           // max variable symbol slots
 #define BASIC_MAX_VAR_NAME_LEN 64           // max length for variable names
 #define BASIC_MAX_STEPS        2000         // max AST node steps per frame before yielding
+#define BASIC_MAX_CALL_ARGS    8            // max number of arguments for function calls
 
 extern char basic_script[BASIC_SCRIPT_SIZE];
 
@@ -77,7 +78,8 @@ typedef struct {
 typedef enum {
   NODE_ASSIGN = 0,
   NODE_PRINT,
-  NODE_WHILE
+  NODE_WHILE,
+  NODE_CALL
 } node_type_t;
 
 //

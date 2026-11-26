@@ -153,6 +153,7 @@ token_t lexer_next(lexer_t *l) {
             case '%': return (token_t){.type = TOKEN_MOD, .start = start_ptr, .length = 1, .line = current_line };
             case '(': return (token_t){.type = TOKEN_LPAREN, .start = start_ptr, .length = 1, .line = current_line };
             case ')': return (token_t){.type = TOKEN_RPAREN, .start = start_ptr, .length = 1, .line = current_line };
+            case ',': return (token_t){.type = TOKEN_COMMA, .start = start_ptr, .length = 1, .line = current_line };
             default:  return (token_t){ .type = TOKEN_UNKNOWN, .start = start_ptr, .length = 1, .line = current_line };
         }
     }

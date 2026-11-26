@@ -2,6 +2,7 @@
 #include <stdlib.h>
 
 #include "basic_rt.h"
+#include "logging.h"
 
 int main(int argc, char **argv) {
     if (argc != 2) {
@@ -24,6 +25,7 @@ int main(int argc, char **argv) {
     fclose(f);
     basic_script[file_size] = '\0';
     basic_init();
+    DEBUG("Begin execution");
     for (;;) {
         basic_update();
         basic_draw();

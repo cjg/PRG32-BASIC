@@ -1,0 +1,2 @@
+t = TICKS()
+PRINT t

@@ -39,6 +39,7 @@ typedef enum {
   TOKEN_NEQ,           /* <> or != */
   TOKEN_LPAREN,        // (
   TOKEN_RPAREN,        // )
+  TOKEN_COMMA,         // ,
 
   TOKEN_UNKNOWN
 } token_type_t;

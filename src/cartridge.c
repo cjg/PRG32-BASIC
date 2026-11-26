@@ -5,6 +5,7 @@
 #define NDEBUG
 
 #include "stdlib.c"
+#include "builtin.c"
 #include "arena.c"
 #include "basic_rt.c"
 #include "lexer.c"

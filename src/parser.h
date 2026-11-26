@@ -48,8 +48,9 @@ typedef struct expr_node {
       struct expr_node *expr;
     } unary;
     struct {
-      int func_id;
-      struct expr_node *args[4];
+      const char *fn_name;
+      uint16_t fn_name_len;
+      struct expr_node *args[BASIC_MAX_CALL_ARGS];
       uint8_t arg_count;
     } call;
   } data;
@@ -74,6 +75,9 @@ struct ast_node {
       expr_node_t *cond;
       ast_node_t *body;
     } while_stmt;
+    struct {
+      expr_node_t *call_expr;
+    } call;
   } data;
 };
 

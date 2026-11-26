@@ -90,6 +90,7 @@ void basic_init() {
     fprintf(stderr, "SYNTAX ERROR LINE %d: %s\n", parser_result.error.line, parser_result.error.message);
     exit(1);
   }
+  program_root = parser_result.node;
   pc = program_root;
 #endif
 }
@@ -100,7 +101,6 @@ static char command_key = 0;
 #define MAX_COMMAND_LEN 20
 static char command_line[MAX_COMMAND_LEN];
 static uint8_t command_len = 0;
-static const char *interactive_error = NULL;
 static bool print_script = false;
 
 #ifndef PRG32_BASIC_DEBUG
@@ -132,7 +132,7 @@ static const char *read_script(const char *filename) {
 }
 
 static void interactive_update() {
-  interactive_error = NULL;
+  error_msg = NULL;
   if (reading_command) {
     uint16_t key = prg32_ps2kbd_read_key();
     if (key != 0) {
@@ -142,7 +142,7 @@ static void interactive_update() {
         command_len++;
         command_line[command_len] = '\0';
         if (command_len + 1 >= MAX_COMMAND_LEN) {
-          interactive_error = "COMMAND TOO LONG";
+          error_msg = "COMMAND TOO LONG";
           command_len = 0;
           start_prompt = true;
         }
@@ -158,8 +158,8 @@ static void interactive_update() {
     // parsing command
     if (strncasecmp(command_line, "RUN ", 4) == 0) {
       // RUN <filename>
-      interactive_error = read_script(command_line + 4);
-      if (interactive_error != NULL) {
+      error_msg = read_script(command_line + 4);
+      if (error_msg != NULL) {
         reading_command = true;
         start_prompt = true;
         return;
@@ -173,7 +173,7 @@ static void interactive_update() {
       parser_result_t parser_result;
       parser_parse(&parser_result, basic_script, strlen(basic_script), &symbol_table);
       if (parser_result.has_error) {
-        interactive_error = "SYNTAX ERROR";
+        error_msg = "SYNTAX ERROR";
         reading_command = true;
         start_prompt = true;
         return;
@@ -184,8 +184,8 @@ static void interactive_update() {
       }
     } else if (strncasecmp(command_line, "CAT ", 4) == 0) {
       // CAT <filename>
-      interactive_error = read_script(command_line + 4);
-      if (interactive_error != NULL) {
+      error_msg = read_script(command_line + 4);
+      if (error_msg != NULL) {
         reading_command = true;
         start_prompt = true;
         return;
@@ -194,7 +194,7 @@ static void interactive_update() {
       reading_command = true;
       start_prompt = true;
     } else {
-      interactive_error = "INVALID COMMAND";
+      error_msg = "INVALID COMMAND";
       reading_command = true;
       start_prompt = true;
     }
@@ -255,11 +255,11 @@ static void interactive_draw() {
     print_script = false;
     return;
   }
-  if (interactive_error) {
+  if (error_msg) {
     prg32_console_write("\n!! ");
-    prg32_console_write(interactive_error);
+    prg32_console_write(error_msg);
     prg32_console_write(" !!\n");
-    interactive_error = NULL;
+    error_msg = NULL;
   }
   if (start_prompt) {
     prg32_console_write("\n> ");
@@ -274,6 +274,7 @@ static void interactive_draw() {
 
 
 static void script_update() {
+  DEBUG("script_update() -- has_error? %d pc: %p", has_error, pc);
   static bool completed_communicated = false;
   if (has_error || !pc) {
     if (!completed_communicated) {
@@ -284,7 +285,7 @@ static void script_update() {
       completed_communicated = true;
     }
     // error or script completed
-    interactive_error = NULL;
+    error_msg = NULL;
     command_len = 0;
     interactive = true;
     start_prompt = true;
@@ -308,7 +309,7 @@ static void script_update() {
           DEBUG("Error evaluating expression: %s", result.error_msg);
           has_error = true;
           error_line = pc->line_number;
-          interactive_error = result.error_msg;
+          error_msg = result.error_msg;
           return;
         }
         if (val.type == VAL_INT) {
@@ -340,6 +341,18 @@ static void script_update() {
         }
         break;
       }
+      case NODE_CALL:
+        DEBUG("Calling function: %s", DEBUG_STR(pc->data.call.call_expr->data.call.fn_name, pc->data.call.call_expr->data.call.fn_name_len));
+        runtime_val_t out_val;
+        runtime_result_t r = eval_expression(pc->data.call.call_expr, &out_val, symbol_table.symbols);
+        if (r.has_error) {
+          DEBUG("Error evaluating expression: %s", r.error_msg);
+          has_error = true;
+          error_line = r.line_number;
+          error_msg = r.error_msg;
+          return;
+        }
+        break;
       default:
         DEBUG("Unexpected node type: %d", pc->type);
         // unexpected node type

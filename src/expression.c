@@ -7,6 +7,7 @@
 #include "lexer.h"
 #include "logging.h"
 #include "strpool.h"
+#include "builtin.h"
 
 #include <assert.h>
 #include <string.h>
@@ -89,6 +90,26 @@ static runtime_result_t eval_binary(expr_node_t *expr, runtime_val_t *out_val, s
     return RUNTIME_ERR(expr, "UNEXPECTED EXPRESSION");
 }
 
+runtime_result_t eval_call(expr_node_t * expr, runtime_val_t * out_val, symbol_entry_t * symbols) {
+    builtin_spec_t spec = builtin_lookup_function(expr->data.call.fn_name, expr->data.call.fn_name_len);
+    if (spec.id == UNKNOWN_FN) {
+        return RUNTIME_ERR(expr, "FUNCTION NOT FOUND");
+    }
+    if (expr->data.call.arg_count != spec.num_args) {
+        return RUNTIME_ERR(expr, "FUNCTION ARGUMENTS COUNT MISMATCH");
+    }
+    if (spec.num_args != 0) {
+        // TODO handle function with arguments
+        return RUNTIME_ERR(expr, "FUNCTION WITH ARGUMENTS NOT SUPPORTED");
+    }
+    DEBUG("Eval call for function %s", DEBUG_STR(expr->data.call.fn_name, expr->data.call.fn_name_len));
+    builtin_result_t r = spec.execute(out_val);
+    if (r.has_error) {
+        return RUNTIME_ERR(expr, r.error);
+    }
+    return RUNTIME_OK();
+}
+
 runtime_result_t eval_expression(expr_node_t *expr, runtime_val_t *out_val, symbol_entry_t symbols[BASIC_MAX_VARS]) {
     assert(expr != NULL);
 
@@ -111,6 +132,9 @@ runtime_result_t eval_expression(expr_node_t *expr, runtime_val_t *out_val, symb
 
         case EXPR_BINARY:
             return eval_binary(expr, out_val, symbols);
+
+        case EXPR_CALL:
+            return eval_call(expr, out_val, symbols);
 
         default:
             return (runtime_result_t){true, expr->line_number, "UNEXPECTED EXPRESSION"};

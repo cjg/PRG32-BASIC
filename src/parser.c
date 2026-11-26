@@ -21,6 +21,8 @@ typedef struct {
     bool has_error;
 } parser_ctx_t;
 
+static expr_node_t *parse_call(parser_ctx_t *parser, token_t ident);
+
 //
 // @brief Advances parser lookahead tokens.
 //
@@ -56,6 +58,13 @@ static expr_node_t *parse_primary(parser_ctx_t *parser) {
     }
 
     if (parser->current.type == TOKEN_IDENTIFIER) {
+        if (parser->peek_token.type == TOKEN_LPAREN) {
+            // function call
+            token_t fn_ident = parser->current;
+            parser_advance(parser);
+
+            return parse_call(parser, fn_ident);
+        }
         node->type = EXPR_VARIABLE;
         node->data.var_slot = symbol_table_get_or_create(parser->symbol_table,
                                                          parser->current.start,
@@ -72,6 +81,8 @@ static expr_node_t *parse_primary(parser_ctx_t *parser) {
  * @brief Pratt parsing expression precedence router
  */
 static expr_node_t *parse_expression(parser_ctx_t *parser) {
+    DEBUG("parse_expression()");
+
     /* Simplified recursive descent expression parser for binary ops */
     expr_node_t *left = parse_primary(parser);
 
@@ -105,6 +116,38 @@ static bool parser_match(parser_ctx_t *parser, token_type_t type) {
         return true;
     }
     return false;
+}
+
+static expr_node_t *parse_call(parser_ctx_t *parser, token_t ident)
+{
+    // Consume '('
+    parser_advance(parser);
+
+    expr_node_t *call = (expr_node_t *) arena_alloc(sizeof(expr_node_t));
+    // TODO: return out of memory error properly
+    if (!call) return NULL;
+
+    call->type = EXPR_CALL;
+    call->data.call.fn_name = ident.start;
+    call->data.call.fn_name_len = ident.length;
+    call->data.call.arg_count = 0;
+
+    if (parser->current.type != TOKEN_RPAREN) {
+        do {
+            expr_node_t *arg = parse_expression(parser);
+            if (!arg || call->data.call.arg_count >= BASIC_MAX_CALL_ARGS) {
+                // FIXME: handle error properly
+                return NULL;
+            }
+            call->data.call.args[call->data.call.arg_count++] = arg;
+        } while (parser_match(parser, TOKEN_COMMA));
+    }
+
+    if (!parser_match(parser, TOKEN_RPAREN)) {
+        return NULL;
+    }
+
+    return call;
 }
 
 //
@@ -143,7 +186,7 @@ static void parse_statement(parser_result_t *result, parser_ctx_t *parser, ast_n
     result->node->next = NULL;
 
     // Assignment: var = expr
-    if (parser->current.type == TOKEN_IDENTIFIER) {
+    if (parser->current.type == TOKEN_IDENTIFIER && parser->peek_token.type == TOKEN_ASSIGN) {
         token_t id_token = parser->current;
         parser_advance(parser);
         if (parser->current.type == TOKEN_ASSIGN) {
@@ -210,7 +253,27 @@ static void parse_statement(parser_result_t *result, parser_ctx_t *parser, ast_n
 
     // function call: identifier followed by left parenthesis
     if (parser->current.type == TOKEN_IDENTIFIER && parser->peek_token.type == TOKEN_LPAREN) {
-        DEBUG("Parsing function call at %d", parser->current.line);
+        token_t fn_ident = parser->current;
+        parser_advance(parser);
+
+        expr_node_t *call_expr = parse_call(parser, fn_ident);
+        if (!call_expr) {
+            result->has_error = true;
+            result->error.line = fn_ident.line;
+            result->error.message = "PARSING FUNCTION CALL";
+            return;
+        }
+        result->node = (ast_node_t *) arena_alloc(sizeof(ast_node_t));
+        if (!result->node) {
+            result->has_error = true;
+            result->error.line = parser->current.line;
+            result->error.message = "no memory available";
+            return;
+        }
+        result->node->parent = parent;
+        result->node->type = NODE_CALL;
+        result->node->data.call.call_expr = call_expr;
+        return;
     }
 
     result->has_error = true;
