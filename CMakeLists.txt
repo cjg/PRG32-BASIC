@@ -19,12 +19,14 @@ set(SOURCE_FILES
         src/expression.c
         src/console.c
         src/builtin.c
+        src/fp.c
         src/qnum.h)
 
 add_custom_command(
-        OUTPUT src/qnum.h
-        DEPENDS hacks/download-qnum.sh
-        COMMAND ${PROJECT_SOURCE_DIR}/hacks/download-qnum.sh ${PROJECT_SOURCE_DIR} ${PROJECT_BINARY_DIR}
+        OUTPUT ${PROJECT_SOURCE_DIR}/src/qnum.h
+        COMMAND rm -rf "${PROJECT_BINARY_DIR}/Qnum"
+        COMMAND git clone https://github.com/Aviato-Dynamics/Qnum.git "${PROJECT_BINARY_DIR}/Qnum"
+        COMMAND cp "${PROJECT_BINARY_DIR}/Qnum/qnum.h" "${PROJECT_SOURCE_DIR}/src"
 )
 
 if ("${BUILD_TYPE}" STREQUAL "cartridge")

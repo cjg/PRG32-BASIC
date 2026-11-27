@@ -7,6 +7,7 @@
 #define PRG32_BASIC_SYMBOL_TABLE_H
 
 #include "basic_rt.h"
+#include "types.h"
 
 #include <stdlib.h>
 

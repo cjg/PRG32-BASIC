@@ -18,6 +18,7 @@ typedef enum {
   /* Literals & Identifiers */
   TOKEN_IDENTIFIER,    // variable name (e.g., score, px, a$)
   TOKEN_INT_LITERAL,   // numeric integer literal
+  TOKEN_REAL_LITERAL,  // numeric real literal
   TOKEN_STR_LITERAL,   // quoted string literal
 
   /* Keywords */

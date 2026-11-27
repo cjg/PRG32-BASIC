@@ -14,3 +14,9 @@
 ```bas
 PRINT "HELLO WORLD"
 ```
+## Acknowledgment
+
+### Fixed-point arithmetic
+
+Fixed-point arithmetic uses the header-only library QNum from Aviato-Dynamics: https://github.com/Aviato-Dynamics/Qnum.
+

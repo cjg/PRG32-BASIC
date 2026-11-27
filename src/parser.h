@@ -13,6 +13,7 @@
 #include "basic_rt.h"
 #include "lexer.h"
 #include "symbol_table.h"
+#include "qnum.h"
 
 #include <stdlib.h>
 
@@ -27,6 +28,7 @@ typedef struct ast_node ast_node_t;
 typedef struct expr_node {
   enum {
     EXPR_INT_LITERAL,
+    EXPR_REAL_LITERAL,
     EXPR_STR_LITERAL,
     EXPR_VARIABLE,
     EXPR_BINARY,
@@ -36,6 +38,7 @@ typedef struct expr_node {
   uint32_t line_number;
   union {
     int32_t int_val;
+    qnum_t real_val;
     string_val_t str_val;
     uint8_t var_slot;
     struct {

@@ -9,6 +9,8 @@
 #include <stdbool.h>
 #include <string.h>
 
+#include "types.h"
+
 //
 // @brief Helper to check if character is alphanumeric or underscore for identifiers.
 //
@@ -87,15 +89,26 @@ token_t lexer_next(lexer_t *l) {
             };
         }
 
-        // numeric integer literals
+        // numeric integer or real literals
         if (isdigit((unsigned char)c)) {
+            token_type_t token_type = TOKEN_INT_LITERAL;
             size_t len = 0;
             while (l->pos < l->len && isdigit((unsigned char)l->src[l->pos])) {
                 l->pos++;
                 len++;
             }
+            if (l->pos < l->len && l->src[l->pos] == '.') {
+                // a number with decimal, move forward and capture next digits
+                l->pos++;
+                len++;
+                while (l->pos < l->len && isdigit((unsigned char)l->src[l->pos])) {
+                    l->pos++;
+                    len++;
+                }
+                token_type = TOKEN_REAL_LITERAL;
+            }
             return (token_t){
-                .type = TOKEN_INT_LITERAL,
+                .type = token_type,
                 .start = start_ptr,
                 .length = len,
                 .line = current_line

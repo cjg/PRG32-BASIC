@@ -110,6 +110,26 @@ runtime_result_t eval_call(expr_node_t * expr, runtime_val_t * out_val, symbol_e
     return RUNTIME_OK();
 }
 
+static runtime_result_t eval_unary(expr_node_t * expr, runtime_val_t * out_val, symbol_entry_t * symbols) {
+    runtime_val_t operand;
+    CHECK_RUNTIME_ERR(eval_expression(expr->data.unary.expr, &operand, symbols));
+
+    switch (expr->data.unary.op) {
+        case TOKEN_MINUS:
+            out_val->type = operand.type;
+            if (operand.type == VAL_INT) {
+                out_val->data.int_val = -operand.data.int_val;
+            } else if (operand.type == VAL_REAL) {
+                out_val->data.real_val = qnum_mul((qnum_t){-1, 0}, operand.data.real_val);
+            } else {
+                return RUNTIME_ERR(expr, "INVALID VALUE TYPE FOR UNARY OPERATOR");
+            }
+            return RUNTIME_OK();
+        default:
+            return RUNTIME_ERR(expr, "UNEXPECTED UNARY OPERATOR");
+    }
+}
+
 runtime_result_t eval_expression(expr_node_t *expr, runtime_val_t *out_val, symbol_entry_t symbols[BASIC_MAX_VARS]) {
     assert(expr != NULL);
 
@@ -121,6 +141,11 @@ runtime_result_t eval_expression(expr_node_t *expr, runtime_val_t *out_val, symb
             out_val->data.int_val = expr->data.int_val;
             return RUNTIME_OK();
 
+        case EXPR_REAL_LITERAL:
+            out_val->type = VAL_REAL;
+            out_val->data.real_val = expr->data.real_val;
+            return RUNTIME_OK();
+
         case EXPR_STR_LITERAL:
             out_val->type = VAL_STR;
             out_val->data.str_val = expr->data.str_val;
@@ -129,6 +154,9 @@ runtime_result_t eval_expression(expr_node_t *expr, runtime_val_t *out_val, symb
         case EXPR_VARIABLE:
             *out_val = symbols[expr->data.var_slot].val;
             return RUNTIME_OK();
+
+        case EXPR_UNARY:
+            return eval_unary(expr, out_val, symbols);
 
         case EXPR_BINARY:
             return eval_binary(expr, out_val, symbols);

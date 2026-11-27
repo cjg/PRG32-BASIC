@@ -33,10 +33,6 @@ size_t strlen(const char *s) {
     return i;
 }
 
-int printf(const char *format, ...) {
-    return 0;
-}
-
 int strncasecmp(const char *s1, const char *s2, size_t n) {
     for (size_t i = 0; i < n; i++) {
         unsigned char c1 = (unsigned char)s1[i];

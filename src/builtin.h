@@ -5,7 +5,7 @@
 #ifndef PRG32_BASIC_BUILTIN_H
 #define PRG32_BASIC_BUILTIN_H
 
-#include "basic_rt.h"
+#include "types.h"
 
 #include <stdint.h>
 

@@ -7,8 +7,11 @@
 
 #include <stdint.h>
 
+#include "qnum.h"
+
 void console_print_string(const char *str);
 void console_print_int(int32_t i);
+void console_print_fp(qnum_t q);
 void console_print_nl();
 
 #endif //PRG32_BASIC_CONSOLE_H

@@ -9,6 +9,7 @@
 #include "arena.h"
 #include "lexer.h"
 #include "logging.h"
+#include "fp.h"
 
 #include <stdlib.h>
 
@@ -39,9 +40,18 @@ static expr_node_t *parse_primary(parser_ctx_t *parser) {
     expr_node_t *node = (expr_node_t *) arena_alloc(sizeof(expr_node_t));
     if (!node) return NULL;
 
+    DEBUG("parse_primary() token type: %d", parser->current.type);
+
     if (parser->current.type == TOKEN_INT_LITERAL) {
         node->type = EXPR_INT_LITERAL;
         node->data.int_val = (int32_t) atoi(parser->current.start);
+        parser_advance(parser);
+        return node;
+    }
+
+    if (parser->current.type == TOKEN_REAL_LITERAL) {
+        node->type = EXPR_REAL_LITERAL;
+        node->data.real_val = fp_parse_qnum(parser->current.start);
         parser_advance(parser);
         return node;
     }
@@ -83,8 +93,28 @@ static expr_node_t *parse_primary(parser_ctx_t *parser) {
 static expr_node_t *parse_expression(parser_ctx_t *parser) {
     DEBUG("parse_expression()");
 
+    // unary expression
+    if (parser->current.type == TOKEN_MINUS) {
+        DEBUG("parse_expression() UNARY");
+        parser_advance(parser);
+        expr_node_t *operand = parse_primary(parser);
+        if (!operand) {
+            return NULL;
+        }
+        expr_node_t *node = arena_alloc(sizeof(expr_node_t));
+        if (!node) {
+            return NULL;
+        }
+        node->type = EXPR_UNARY;
+        node->data.unary.op = TOKEN_MINUS;
+        node->data.unary.expr = operand;
+        return node;
+    }
+
     /* Simplified recursive descent expression parser for binary ops */
     expr_node_t *left = parse_primary(parser);
+
+    DEBUG("parse_expression(): left->type = %d", left->type);
 
     while (parser->current.type == TOKEN_PLUS || parser->current.type == TOKEN_MINUS ||
            parser->current.type == TOKEN_ASTERISK || parser->current.type == TOKEN_SLASH ||
