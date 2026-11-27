@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.15)
 project(prg32_basic C)
 
-set(CACHE{BUILD_TYPE} TYPE STRING HELP "Set the build type, either 'cartridge' or 'host'" VALUE "")
+set(CACHE{BUILD_TYPE} TYPE STRING HELP "Set the build type, either 'cartridge' or 'host'" VALUE "host")
 
 if (NOT DEFINED BUILD_TYPE)
     message(SEND_ERROR "'BUILD_TYPE' not defined")
@@ -19,7 +19,13 @@ set(SOURCE_FILES
         src/expression.c
         src/console.c
         src/builtin.c
-        src/builtin.h)
+        src/qnum.h)
+
+add_custom_command(
+        OUTPUT src/qnum.h
+        DEPENDS hacks/download-qnum.sh
+        COMMAND ${PROJECT_SOURCE_DIR}/hacks/download-qnum.sh ${PROJECT_SOURCE_DIR} ${PROJECT_BINARY_DIR}
+)
 
 if ("${BUILD_TYPE}" STREQUAL "cartridge")
     enable_language(C ASM)
