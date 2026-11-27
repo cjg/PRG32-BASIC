@@ -196,6 +196,11 @@ static void parse_statement(parser_result_t *result, parser_ctx_t *parser, ast_n
                                                                             id_token.start,
                                                                             id_token.length);
             result->node->data.assign.expr = parse_expression(parser);
+            if (result->node->data.assign.expr == NULL) {
+                result->has_error = true;
+                result->error.line = parser->current.line;
+                result->error.message = "EXPECTED EXPRESSION";
+            }
             return;
         }
     }
