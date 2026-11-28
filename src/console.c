@@ -107,7 +107,7 @@ void console_print_fp(qnum_t v) {
     }
     console_print_int(whole);
     console_putc('.');
-    while  (dec_frac < scale10 / 10) {
+    while  (dec_frac > 0 && dec_frac < scale10 / 10) {
         dec_frac *= 10;
         console_putc('0');
     }

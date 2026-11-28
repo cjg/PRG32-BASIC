@@ -55,6 +55,58 @@ static runtime_result_t eval_binary(expr_node_t *expr, runtime_val_t *out_val, s
 
     if (left.type == VAL_STR) strpool_pop_roots(1);
 
+    // promoting to REAL if one of the two is a REAL
+    if (left.type == VAL_REAL && right.type == VAL_INT) {
+        right.type = VAL_REAL;
+        right.data.real_val = int_to_qnum(right.data.int_val);
+    }
+
+    if (left.type == VAL_INT && right.type == VAL_REAL) {
+        left.type = VAL_REAL;
+        left.data.real_val = int_to_qnum(left.data.int_val);
+    }
+
+    DEBUG("Binary, left type: %d right type: %d op: %d", left.type, right.type, expr->data.binary.op);
+
+    if (left.type == VAL_REAL && right.type == VAL_REAL) {
+        qnum_t l = left.data.real_val;
+        qnum_t r = right.data.real_val;
+        out_val->type = VAL_REAL;
+        switch (expr->data.binary.op) {
+            case TOKEN_PLUS: out_val->data.real_val = qnum_add(l, r);
+                break;
+            case TOKEN_MINUS: out_val->data.real_val = qnum_sub(l, r);
+                break;
+            case TOKEN_ASTERISK: out_val->data.real_val = qnum_mul(l, r);
+                break;
+            case TOKEN_SLASH: if (qnum_eq(r, QNUM_ZERO)) return RUNTIME_ERR(expr, "DIVISION BY 0");
+                out_val->data.real_val = qnum_div(l, r);
+                break;
+            case TOKEN_NEQ:
+                out_val->type = VAL_INT;
+                out_val->data.int_val = qnum_eq(l, r) ? 0 : 1;
+                break;
+            case TOKEN_LT:
+                out_val->type = VAL_INT;
+                out_val->data.int_val = qnum_lt(l, r) ? 1 : 0;
+                break;
+            case TOKEN_GT:
+                out_val->type = VAL_INT;
+                out_val->data.int_val = qnum_gt(l, r) ? 1 : 0;
+                break;
+            case TOKEN_LTE:
+                out_val->type = VAL_INT;
+                out_val->data.int_val = qnum_le(l, r) ? 1 : 0;
+                break;
+            case TOKEN_GTE:
+                out_val->type = VAL_INT;
+                out_val->data.int_val = qnum_ge(l, r) ? 1 : 0;
+                break;
+            default: return RUNTIME_ERR(expr, "UNEXPECTED BINARY EXPRESSION");
+        }
+        return RUNTIME_OK();
+    }
+
     // standard integer binary operations
     if (left.type == VAL_INT && right.type == VAL_INT) {
         int32_t l = left.data.int_val;
