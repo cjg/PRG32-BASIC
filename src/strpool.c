@@ -4,6 +4,8 @@
 
 #include "strpool.h"
 
+#include "logging.h"
+
 #include <string.h>
 
 // dual 1 KB static string banks residing in .bss
@@ -59,6 +61,7 @@ static void relocate_string(string_val_t* sval, const uint8_t target_bank, uint1
 }
 
 void strpool_gc(void) {
+  DEBUG(">>> strpool_gc active bank %d offset %d", active_bank, str_offset);
   // When the active bank runs out of space, we must salvage all live strings
   // referenced by variables and active expression roots, copy them into the inactive bank,
   // and update their pointers accordingly before switching banks.
@@ -83,6 +86,7 @@ void strpool_gc(void) {
   // switch active bank and update offset
   active_bank = target_bank;
   str_offset = target_offset;
+  DEBUG("<<< strpool_gc active bank %d offset %d", active_bank, str_offset);
 }
 
 const char* strpool_alloc(const char* src, uint16_t len) {
@@ -96,7 +100,9 @@ const char* strpool_alloc(const char* src, uint16_t len) {
   }
 
   char* dest = &str_banks[active_bank][str_offset];
-  memcpy(dest, src, len);
+  if (src != NULL) {
+    memcpy(dest, src, len);
+  }
   str_offset += len;
 
   return dest;
