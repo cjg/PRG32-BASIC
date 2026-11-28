@@ -11,6 +11,7 @@
 
 typedef enum {
     TICKS_FN,
+    SQRT_FN,
 
     UNKNOWN_FN,
 } builtin_fn_t;
@@ -20,7 +21,7 @@ typedef struct {
     const char *error;
 } builtin_result_t;
 
-typedef builtin_result_t (*builtin_function_handler_t)(runtime_val_t *out_val);
+typedef builtin_result_t (*builtin_function_handler_t)(runtime_val_t *out_val, runtime_val_t *args);
 
 typedef struct {
     builtin_fn_t id;

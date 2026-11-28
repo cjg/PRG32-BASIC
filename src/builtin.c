@@ -3,6 +3,7 @@
 //
 
 #include "builtin.h"
+
 #include "console.h"
 
 #include <string.h>
@@ -14,8 +15,9 @@
 #endif
 
 #define BUILTIN_OK() (builtin_result_t) { .has_error = false, .error = NULL }
+#define BUILTIN_ERR(msg) ((builtin_result_t) { .has_error = false, .error = (msg) })
 
-static builtin_result_t execute_ticks(runtime_val_t *out_val) {
+static builtin_result_t execute_ticks(runtime_val_t *out_val, runtime_val_t *args) {
     // FIXME: VAL_INT is too small
     out_val->type = VAL_INT;
 #ifdef PRG32_BASIC_DEBUG
@@ -28,8 +30,25 @@ static builtin_result_t execute_ticks(runtime_val_t *out_val) {
     return BUILTIN_OK();
 }
 
+static builtin_result_t execute_sqrt(runtime_val_t *out_val, runtime_val_t *args) {
+    // if the argument is an INT we convert it to REAL
+    if (args[0].type == VAL_INT) {
+        args[0].type = VAL_REAL;
+        args[0].data.real_val = int_to_qnum(args[0].data.int_val);
+    }
+
+    if (args[0].type != VAL_REAL) {
+        return BUILTIN_ERR("INVALID ARGUMENT TYPE FOR SQRT");
+    }
+
+    out_val->type = VAL_REAL;
+    out_val->data.real_val = qnum_sqrt(args[0].data.real_val);
+    return BUILTIN_OK();
+}
+
 static const builtin_spec_t builtin_functions[] = {
     {.id = TICKS_FN, .name = "TICKS", .num_args = 0, .execute = execute_ticks},
+    {.id = SQRT_FN, .name = "SQRT", .num_args = 1, .execute = execute_sqrt},
 };
 
 builtin_spec_t builtin_lookup_function(const char *name, uint16_t len) {

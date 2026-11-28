@@ -156,12 +156,15 @@ runtime_result_t eval_call(expr_node_t * expr, runtime_val_t * out_val, symbol_e
     if (expr->data.call.arg_count != spec.num_args) {
         return RUNTIME_ERR(expr, "FUNCTION ARGUMENTS COUNT MISMATCH");
     }
-    if (spec.num_args != 0) {
-        // TODO handle function with arguments
-        return RUNTIME_ERR(expr, "FUNCTION WITH ARGUMENTS NOT SUPPORTED");
+    if (spec.num_args != expr->data.call.arg_count) {
+        return RUNTIME_ERR(expr, "ARG COUNT MISMATCH");
+    }
+    runtime_val_t args[BASIC_MAX_CALL_ARGS];
+    for (uint8_t i = 0; i < expr->data.call.arg_count; i++) {
+        CHECK_RUNTIME_ERR(eval_expression(expr->data.call.args[i], &args[i], symbols));
     }
     DEBUG("Eval call for function %s", DEBUG_STR(expr->data.call.fn_name, expr->data.call.fn_name_len));
-    builtin_result_t r = spec.execute(out_val);
+    builtin_result_t r = spec.execute(out_val, args);
     if (r.has_error) {
         return RUNTIME_ERR(expr, r.error);
     }
