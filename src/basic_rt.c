@@ -396,27 +396,29 @@ static void script_draw() {
             case NODE_PRINT: {
                 DEBUG("Executing PRINT at line %d", pc->line_number);
                 runtime_val_t val;
-                HANDLE_RUNTIME_ERR(eval_expression(pc->data.print_stmt.expr, &val, symbol_table.symbols));
-                DEBUG("Evaluated expression in PRINT type: %d", val.type);
-                if (val.type == VAL_INT) {
-                    console_print_int(val.data.int_val);
-                    console_print_nl();
-                } else if (val.type == VAL_REAL) {
-                    console_print_fp(val.data.real_val);
-                    console_print_nl();
-                } else if (val.type == VAL_STR) {
-                    uint16_t len = val.data.str_val.len;
-                    if (len >= sizeof(print_buffer)) {
-                        len = sizeof(print_buffer) - 1;
+                expr_node_t *curr = pc->data.print_stmt.expr;
+                while (curr) {
+                    HANDLE_RUNTIME_ERR(eval_expression(curr, &val, symbol_table.symbols));
+                    DEBUG("Evaluated expression in PRINT type: %d", val.type);
+                    if (val.type == VAL_INT) {
+                        console_print_int(val.data.int_val);
+                    } else if (val.type == VAL_REAL) {
+                        console_print_fp(val.data.real_val);
+                    } else if (val.type == VAL_STR) {
+                        uint16_t len = val.data.str_val.len;
+                        if (len >= sizeof(print_buffer)) {
+                            len = sizeof(print_buffer) - 1;
+                        }
+                        memcpy(print_buffer, val.data.str_val.ptr, len);
+                        print_buffer[len] = '\0';
+                        console_print_string(print_buffer);
+                    } else {
+                        runtime_result_t err = RUNTIME_ERR(pc, "INVALID VALUE TYPE FOR PRINT");
+                        HANDLE_RUNTIME_ERR(err);
                     }
-                    memcpy(print_buffer, val.data.str_val.ptr, len);
-                    print_buffer[len] = '\0';
-                    console_print_string(print_buffer);
-                    console_print_nl();
-                } else {
-                    runtime_result_t err = RUNTIME_ERR(pc, "INVALID VALUE TYPE FOR PRINT");
-                    HANDLE_RUNTIME_ERR(err);
+                    curr = curr->next;
                 }
+                console_print_nl();
             }
             break;
             default:

@@ -309,12 +309,24 @@ static void parse_statement(parser_result_t *result, parser_ctx_t *parser, ast_n
     if (parser->current.type == TOKEN_KW_PRINT) {
         result->node->type = NODE_PRINT;
         parser_advance(parser);
-        result->node->data.print_stmt.expr = parse_expression(parser);
-        if (result->node->data.print_stmt.expr == NULL) {
-            result->has_error = true;
-            result->error.line = parser->current.line;
-            result->error.message = "EXPECTED EXPRESSION";
-        }
+
+        expr_node_t head = {0};
+        expr_node_t *current = &head;
+        do {
+            expr_node_t *expr = parse_expression(parser);
+            if (expr == NULL) {
+                parser->has_error = true;
+                result->has_error = true;
+                result->error.line = parser->current.line;
+                result->error.message = "EXPECTED EXPRESSION";
+                return;
+            }
+            current->next = expr;
+            expr->next = NULL;
+            current = current->next;
+        } while (parser_match(parser, TOKEN_COMMA));
+
+        result->node->data.print_stmt.expr = head.next;
         return;
     }
 

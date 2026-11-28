@@ -22,6 +22,8 @@
 //
 typedef struct ast_node ast_node_t;
 
+typedef struct expr_node expr_node_t;
+
 //
 // @brief Expression AST node structure
 //
@@ -36,6 +38,7 @@ typedef struct expr_node {
     EXPR_CALL
 } type;
   uint32_t line_number;
+  expr_node_t *next; // single-linked list of expressions, for print and args
   union {
     int32_t int_val;
     qnum_t real_val;
