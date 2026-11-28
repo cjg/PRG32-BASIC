@@ -9,13 +9,6 @@
 
 #include <stdint.h>
 
-typedef enum {
-    TICKS_FN,
-    SQRT_FN,
-
-    UNKNOWN_FN,
-} builtin_fn_t;
-
 typedef struct {
     bool has_error;
     const char *error;
@@ -24,7 +17,6 @@ typedef struct {
 typedef builtin_result_t (*builtin_function_handler_t)(runtime_val_t *out_val, runtime_val_t *args);
 
 typedef struct {
-    builtin_fn_t id;
     const char *name;
     uint8_t num_args;
     builtin_function_handler_t execute;
@@ -33,6 +25,6 @@ typedef struct {
 //
 // Return builtin function from name
 //
-builtin_spec_t builtin_lookup_function(const char *name, uint16_t len);
+bool builtin_lookup_function(builtin_spec_t *spec, const char *name, uint16_t len);
 
 #endif //PRG32_BASIC_BUILTIN_H

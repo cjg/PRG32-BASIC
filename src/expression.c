@@ -149,11 +149,12 @@ static runtime_result_t eval_binary(expr_node_t *expr, runtime_val_t *out_val, s
 }
 
 runtime_result_t eval_call(expr_node_t * expr, runtime_val_t * out_val, symbol_entry_t * symbols) {
-    builtin_spec_t spec = builtin_lookup_function(expr->data.call.fn_name, expr->data.call.fn_name_len);
-    if (spec.id == UNKNOWN_FN) {
+    builtin_spec_t spec;
+    if (!builtin_lookup_function(&spec, expr->data.call.fn_name, expr->data.call.fn_name_len)) {
         return RUNTIME_ERR(expr, "FUNCTION NOT FOUND");
     }
     if (expr->data.call.arg_count != spec.num_args) {
+        DEBUG("Expected %d args, got %d", spec.num_args, expr->data.call.arg_count);
         return RUNTIME_ERR(expr, "FUNCTION ARGUMENTS COUNT MISMATCH");
     }
     if (spec.num_args != expr->data.call.arg_count) {

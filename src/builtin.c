@@ -9,6 +9,7 @@
 #include <string.h>
 
 #ifdef PRG32_BASIC_DEBUG
+#include <stdlib.h>
 #include <time.h>
 #else
 #include <prg32.h>
@@ -23,10 +24,27 @@ static builtin_result_t execute_ticks(runtime_val_t *out_val, runtime_val_t *arg
 #ifdef PRG32_BASIC_DEBUG
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
-    out_val->data.int_val = (int32_t)((uint64_t)ts.tv_sec * 1000ULL + (uint64_t)ts.tv_nsec / 1000000ULL);
+    out_val->data.int_val = (int32_t) ((uint64_t) ts.tv_sec * 1000ULL + (uint64_t) ts.tv_nsec / 1000000ULL);
 #else
     out_val->data.int_val = prg32_ticks_ms();
 #endif
+    return BUILTIN_OK();
+}
+
+static builtin_result_t execute_rnd(runtime_val_t *out_val, runtime_val_t *args) {
+    out_val->type = VAL_REAL;
+
+#ifdef PRG32_BASIC_DEBUG
+    srand(time(NULL));
+    int r = rand();
+    out_val->data.real_val = float_to_qnum((double) r / RAND_MAX);
+#else
+#define MAX_RANDOM (UINT32_MAX / 2 - 1)
+    int32_t r = prg32_random(0, MAX_RANDOM);
+    out_val->data.real_val = qnum_div(int_to_qnum(r), int_to_qnum(MAX_RANDOM));
+#undef MAX_RANDOM
+#endif
+
     return BUILTIN_OK();
 }
 
@@ -47,15 +65,18 @@ static builtin_result_t execute_sqrt(runtime_val_t *out_val, runtime_val_t *args
 }
 
 static const builtin_spec_t builtin_functions[] = {
-    {.id = TICKS_FN, .name = "TICKS", .num_args = 0, .execute = execute_ticks},
-    {.id = SQRT_FN, .name = "SQRT", .num_args = 1, .execute = execute_sqrt},
+    {.name = "RND", .num_args = 0, .execute = execute_rnd},
+    {.name = "SQRT", .num_args = 1, .execute = execute_sqrt},
+    {.name = "TICKS", .num_args = 0, .execute = execute_ticks},
 };
 
-builtin_spec_t builtin_lookup_function(const char *name, uint16_t len) {
+bool builtin_lookup_function(builtin_spec_t *spec, const char *name, uint16_t len) {
     for (unsigned i = 0; i < sizeof(builtin_functions) / sizeof(builtin_functions[0]); i++) {
         if (strlen(builtin_functions[i].name) == len && strncasecmp(name, builtin_functions[i].name, len) == 0) {
-            return (builtin_spec_t ){.num_args = builtin_functions[i].num_args, .execute = builtin_functions[i].execute};
+            spec->num_args = builtin_functions[i].num_args;
+            spec->execute = builtin_functions[i].execute;
+            return true;
         }
     }
-    return (builtin_spec_t ){.id = UNKNOWN_FN};
+    return false;
 }
