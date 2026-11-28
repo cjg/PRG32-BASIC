@@ -14,3 +14,5 @@ while i <= n
 end while
 
 print s
+
+print 1 * -2

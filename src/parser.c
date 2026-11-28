@@ -23,6 +23,50 @@ typedef struct {
 } parser_ctx_t;
 
 static expr_node_t *parse_call(parser_ctx_t *parser, token_t ident);
+static expr_node_t *parse_expression(parser_ctx_t *parser);
+
+typedef enum {
+    PREC_NONE = 0,
+    PREC_COMPARISON, /* =, <>, <, >, <=, >= */
+    PREC_TERM,       /* +, - */
+    PREC_FACTOR,     /* *, /, % */
+    PREC_UNARY       /* unary -, + */
+} precedence_t;
+
+static precedence_t get_infix_precedence(token_type_t type) {
+    switch (type) {
+        case TOKEN_ASSIGN:
+        case TOKEN_LT:
+        case TOKEN_GT:
+        case TOKEN_LTE:
+        case TOKEN_GTE:
+        case TOKEN_NEQ:
+            return PREC_COMPARISON;
+        case TOKEN_PLUS:
+        case TOKEN_MINUS:
+            return PREC_TERM;
+        case TOKEN_ASTERISK:
+        case TOKEN_SLASH:
+        case TOKEN_MOD:
+            return PREC_FACTOR;
+        default:
+            return PREC_NONE;
+    }
+}
+
+//
+// @brief Allocates and initializes an expression AST node from the static arena.
+//
+static expr_node_t *alloc_expr_node(parser_ctx_t *parser, int type, uint32_t line_number) {
+    expr_node_t *node = (expr_node_t *) arena_alloc(sizeof(expr_node_t));
+    if (!node) {
+        parser->has_error = true;
+        return NULL;
+    }
+    node->type = type;
+    node->line_number = line_number;
+    return node;
+}
 
 //
 // @brief Advances parser lookahead tokens.
@@ -31,110 +75,6 @@ static void parser_advance(parser_ctx_t *parser) {
     parser->current = parser->peek_token;
     parser->peek_token = lexer_next(&parser->lexer);
     DEBUG("Current lexer token type: %d", parser->current.type);
-}
-
-//
-// @brief Parses a primary expression literals, variables, parentheses, built-ins
-//
-static expr_node_t *parse_primary(parser_ctx_t *parser) {
-    expr_node_t *node = (expr_node_t *) arena_alloc(sizeof(expr_node_t));
-    if (!node) return NULL;
-
-    DEBUG("parse_primary() token type: %d", parser->current.type);
-
-    if (parser->current.type == TOKEN_INT_LITERAL) {
-        node->type = EXPR_INT_LITERAL;
-        node->data.int_val = (int32_t) atoi(parser->current.start);
-        parser_advance(parser);
-        return node;
-    }
-
-    if (parser->current.type == TOKEN_REAL_LITERAL) {
-        node->type = EXPR_REAL_LITERAL;
-        node->data.real_val = fp_parse_qnum(parser->current.start);
-        parser_advance(parser);
-        return node;
-    }
-
-    if (parser->current.type == TOKEN_STR_LITERAL) {
-        node->type = EXPR_STR_LITERAL;
-        node->data.str_val = (string_val_t){
-            .ptr = parser->current.start,
-            .len = (uint16_t) parser->current.length,
-            .is_literal = true
-        };
-        parser_advance(parser);
-        return node;
-    }
-
-    if (parser->current.type == TOKEN_IDENTIFIER) {
-        if (parser->peek_token.type == TOKEN_LPAREN) {
-            // function call
-            token_t fn_ident = parser->current;
-            parser_advance(parser);
-
-            return parse_call(parser, fn_ident);
-        }
-        node->type = EXPR_VARIABLE;
-        node->data.var_slot = symbol_table_get_or_create(parser->symbol_table,
-                                                         parser->current.start,
-                                                         parser->current.length);
-        parser_advance(parser);
-        return node;
-    }
-
-    parser->has_error = true;
-    return NULL;
-}
-
-/**
- * @brief Pratt parsing expression precedence router
- */
-static expr_node_t *parse_expression(parser_ctx_t *parser) {
-    DEBUG("parse_expression()");
-
-    // unary expression
-    if (parser->current.type == TOKEN_MINUS) {
-        DEBUG("parse_expression() UNARY");
-        parser_advance(parser);
-        expr_node_t *operand = parse_primary(parser);
-        if (!operand) {
-            return NULL;
-        }
-        expr_node_t *node = arena_alloc(sizeof(expr_node_t));
-        if (!node) {
-            return NULL;
-        }
-        node->type = EXPR_UNARY;
-        node->data.unary.op = TOKEN_MINUS;
-        node->data.unary.expr = operand;
-        return node;
-    }
-
-    /* Simplified recursive descent expression parser for binary ops */
-    expr_node_t *left = parse_primary(parser);
-
-    DEBUG("parse_expression(): left->type = %d", left->type);
-
-    while (parser->current.type == TOKEN_PLUS || parser->current.type == TOKEN_MINUS ||
-           parser->current.type == TOKEN_ASTERISK || parser->current.type == TOKEN_SLASH ||
-           parser->current.type == TOKEN_MOD ||
-           parser->current.type == TOKEN_NEQ || parser->current.type == TOKEN_LT ||
-           parser->current.type == TOKEN_GT || parser->current.type == TOKEN_LTE ||
-           parser->current.type == TOKEN_GTE) {
-        token_t op_token = parser->current;
-        parser_advance(parser);
-
-        expr_node_t *right = parse_primary(parser);
-        expr_node_t *bin_node = (expr_node_t *) arena_alloc(sizeof(expr_node_t));
-        bin_node->type = EXPR_BINARY;
-        bin_node->data.binary.op = op_token.type;
-        bin_node->data.binary.left = left;
-        bin_node->data.binary.right = right;
-        left = bin_node;
-    }
-
-    return left;
 }
 
 //
@@ -148,25 +88,152 @@ static bool parser_match(parser_ctx_t *parser, token_type_t type) {
     return false;
 }
 
+static expr_node_t *parse_expression_bp(parser_ctx_t *parser, precedence_t min_prec);
+
+//
+// @brief Parses a prefix expression: literals, variables, parentheses, unary ops, calls
+//
+static expr_node_t *parse_prefix(parser_ctx_t *parser) {
+    token_t tok = parser->current;
+    DEBUG("parse_prefix() token type: %d", tok.type);
+
+    if (tok.type == TOKEN_LPAREN) {
+        parser_advance(parser);
+        expr_node_t *inner = parse_expression_bp(parser, PREC_NONE);
+        if (!inner) {
+            return NULL;
+        }
+        if (!parser_match(parser, TOKEN_RPAREN)) {
+            parser->has_error = true;
+            return NULL;
+        }
+        return inner;
+    }
+
+    if (tok.type == TOKEN_MINUS || tok.type == TOKEN_PLUS) {
+        DEBUG("parse_prefix() UNARY %d", tok.type);
+        parser_advance(parser);
+        expr_node_t *operand = parse_expression_bp(parser, PREC_UNARY);
+        if (!operand) {
+            return NULL;
+        }
+        expr_node_t *node = alloc_expr_node(parser, EXPR_UNARY, tok.line);
+        if (!node) {
+            return NULL;
+        }
+        node->data.unary.op = tok.type;
+        node->data.unary.expr = operand;
+        return node;
+    }
+
+    if (tok.type == TOKEN_INT_LITERAL) {
+        expr_node_t *node = alloc_expr_node(parser, EXPR_INT_LITERAL, tok.line);
+        if (!node) return NULL;
+        node->data.int_val = (int32_t) atoi(tok.start);
+        parser_advance(parser);
+        return node;
+    }
+
+    if (tok.type == TOKEN_REAL_LITERAL) {
+        expr_node_t *node = alloc_expr_node(parser, EXPR_REAL_LITERAL, tok.line);
+        if (!node) return NULL;
+        node->data.real_val = fp_parse_qnum(tok.start);
+        parser_advance(parser);
+        return node;
+    }
+
+    if (tok.type == TOKEN_STR_LITERAL) {
+        expr_node_t *node = alloc_expr_node(parser, EXPR_STR_LITERAL, tok.line);
+        if (!node) return NULL;
+        node->data.str_val = (string_val_t){
+            .ptr = tok.start,
+            .len = (uint16_t) tok.length,
+            .is_literal = true
+        };
+        parser_advance(parser);
+        return node;
+    }
+
+    if (tok.type == TOKEN_IDENTIFIER) {
+        if (parser->peek_token.type == TOKEN_LPAREN) {
+            // function call
+            parser_advance(parser);
+            return parse_call(parser, tok);
+        }
+        expr_node_t *node = alloc_expr_node(parser, EXPR_VARIABLE, tok.line);
+        if (!node) return NULL;
+        node->data.var_slot = symbol_table_get_or_create(parser->symbol_table,
+                                                         tok.start,
+                                                         tok.length);
+        parser_advance(parser);
+        return node;
+    }
+
+    parser->has_error = true;
+    return NULL;
+}
+
+/**
+ * @brief Pratt parsing expression precedence router
+ */
+static expr_node_t *parse_expression_bp(parser_ctx_t *parser, precedence_t min_prec) {
+    DEBUG("parse_expression_bp(min_prec=%d)", min_prec);
+
+    expr_node_t *left = parse_prefix(parser);
+    if (!left) {
+        return NULL;
+    }
+
+    DEBUG("parse_expression_bp(): left->type = %d", left->type);
+
+    for (;;) {
+        precedence_t prec = get_infix_precedence(parser->current.type);
+        if (prec <= min_prec) {
+            break;
+        }
+
+        token_t op_token = parser->current;
+        parser_advance(parser);
+
+        expr_node_t *right = parse_expression_bp(parser, prec);
+        if (!right) {
+            return NULL;
+        }
+
+        expr_node_t *bin_node = alloc_expr_node(parser, EXPR_BINARY, op_token.line);
+        if (!bin_node) {
+            return NULL;
+        }
+        bin_node->data.binary.op = op_token.type;
+        bin_node->data.binary.left = left;
+        bin_node->data.binary.right = right;
+        left = bin_node;
+    }
+
+    return left;
+}
+
+static expr_node_t *parse_expression(parser_ctx_t *parser) {
+    return parse_expression_bp(parser, PREC_NONE);
+}
+
 static expr_node_t *parse_call(parser_ctx_t *parser, token_t ident)
 {
     // Consume '('
     parser_advance(parser);
 
-    expr_node_t *call = (expr_node_t *) arena_alloc(sizeof(expr_node_t));
-    // TODO: return out of memory error properly
+    expr_node_t *call = alloc_expr_node(parser, EXPR_CALL, ident.line);
     if (!call) return NULL;
 
-    call->type = EXPR_CALL;
     call->data.call.fn_name = ident.start;
-    call->data.call.fn_name_len = ident.length;
+    call->data.call.fn_name_len = (uint16_t) ident.length;
     call->data.call.arg_count = 0;
 
     if (parser->current.type != TOKEN_RPAREN) {
         do {
             expr_node_t *arg = parse_expression(parser);
             if (!arg || call->data.call.arg_count >= BASIC_MAX_CALL_ARGS) {
-                // FIXME: handle error properly
+                parser->has_error = true;
                 return NULL;
             }
             call->data.call.args[call->data.call.arg_count++] = arg;
@@ -174,6 +241,7 @@ static expr_node_t *parse_call(parser_ctx_t *parser, token_t ident)
     }
 
     if (!parser_match(parser, TOKEN_RPAREN)) {
+        parser->has_error = true;
         return NULL;
     }
 
@@ -196,6 +264,7 @@ static void parse_statement(parser_result_t *result, parser_ctx_t *parser, ast_n
     // reached end of file
     if (parser->current.type == TOKEN_EOF) {
         result->has_error = false;
+        result->node = NULL;
         DEBUG("End of file");
         return;
     }
@@ -211,6 +280,7 @@ static void parse_statement(parser_result_t *result, parser_ctx_t *parser, ast_n
     }
 
     result->has_error = false;
+    result->error = (parser_error_t){0};
     result->node->parent = parent;
     result->node->line_number = parser->current.line;
     result->node->next = NULL;
@@ -240,6 +310,11 @@ static void parse_statement(parser_result_t *result, parser_ctx_t *parser, ast_n
         result->node->type = NODE_PRINT;
         parser_advance(parser);
         result->node->data.print_stmt.expr = parse_expression(parser);
+        if (result->node->data.print_stmt.expr == NULL) {
+            result->has_error = true;
+            result->error.line = parser->current.line;
+            result->error.message = "EXPECTED EXPRESSION";
+        }
         return;
     }
 
@@ -249,15 +324,26 @@ static void parse_statement(parser_result_t *result, parser_ctx_t *parser, ast_n
         result->node->type = NODE_WHILE;
         parser_advance(parser);
         result->node->data.while_stmt.cond = parse_expression(parser);
+        if (result->node->data.while_stmt.cond == NULL) {
+            result->has_error = true;
+            result->error.line = parser->current.line;
+            result->error.message = "EXPECTED EXPRESSION";
+            return;
+        }
         DEBUG("Parsed loop condition %p", result->node->data.while_stmt.cond);
 
         ast_node_t head_dummy = {0};
         ast_node_t *curr = &head_dummy;
         bool end_found = false;
-        while (parser->current.type != TOKEN_KW_END && parser->current.type != TOKEN_EOF) {
+        for (;;) {
+            while (parser->current.type == TOKEN_NEWLINE) {
+                parser_advance(parser);
+            }
+            if (parser->current.type == TOKEN_KW_END || parser->current.type == TOKEN_EOF) {
+                break;
+            }
             DEBUG("Parsing WHILE body, current type: %d", parser->current.type);
-            parser_result_t res;
-            res.node = (ast_node_t *) arena_alloc(sizeof(ast_node_t));
+            parser_result_t res = {0};
             parse_statement(&res, parser, result->node);
             if (res.has_error) {
                 if (res.error.token_type == TOKEN_KW_END) {
@@ -269,9 +355,11 @@ static void parse_statement(parser_result_t *result, parser_ctx_t *parser, ast_n
                 result->error = res.error;
                 return;
             }
-            DEBUG("Parsed statement in WHILE body");
-            curr->next = res.node;
-            if (curr->next) curr = curr->next;
+            if (res.node) {
+                DEBUG("Parsed statement in WHILE body");
+                curr->next = res.node;
+                curr = curr->next;
+            }
         }
         // go back to evaluate condition
         curr->next = result->node;
@@ -298,14 +386,6 @@ static void parse_statement(parser_result_t *result, parser_ctx_t *parser, ast_n
             result->error.message = "PARSING FUNCTION CALL";
             return;
         }
-        result->node = (ast_node_t *) arena_alloc(sizeof(ast_node_t));
-        if (!result->node) {
-            result->has_error = true;
-            result->error.line = parser->current.line;
-            result->error.message = "no memory available";
-            return;
-        }
-        result->node->parent = parent;
         result->node->type = NODE_CALL;
         result->node->data.call.call_expr = call_expr;
         return;
@@ -335,7 +415,7 @@ void parser_parse(parser_result_t *result, const char *src, size_t len, symbol_t
 
     while (parser.current.type != TOKEN_EOF && !parser.has_error) {
         DEBUG("Parsing statement |%s|\n", parser.current.start);
-        parser_result_t statement_result;
+        parser_result_t statement_result = {0};
         parse_statement(&statement_result, &parser, curr);
         if (statement_result.has_error) {
             DEBUG("syntax error?!");
@@ -343,7 +423,9 @@ void parser_parse(parser_result_t *result, const char *src, size_t len, symbol_t
             result->error = statement_result.error;
             return;
         }
-        assert(statement_result.node != NULL);
+        if (statement_result.node == NULL) {
+            break;
+        }
         DEBUG("Parsed statement type %d\n", statement_result.node->type);
         curr->next = statement_result.node;
         curr = statement_result.node;
@@ -352,7 +434,9 @@ void parser_parse(parser_result_t *result, const char *src, size_t len, symbol_t
 
     // TODO: validate AST
 
-    head_dummy.next->parent = NULL;
+    if (head_dummy.next) {
+        head_dummy.next->parent = NULL;
+    }
     result->has_error = false;
     result->node = head_dummy.next;
 }

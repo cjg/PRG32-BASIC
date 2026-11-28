@@ -82,6 +82,10 @@ static runtime_result_t eval_binary(expr_node_t *expr, runtime_val_t *out_val, s
             case TOKEN_SLASH: if (qnum_eq(r, QNUM_ZERO)) return RUNTIME_ERR(expr, "DIVISION BY 0");
                 out_val->data.real_val = qnum_div(l, r);
                 break;
+            case TOKEN_ASSIGN:
+                out_val->type = VAL_INT;
+                out_val->data.int_val = qnum_eq(l, r) ? 1 : 0;
+                break;
             case TOKEN_NEQ:
                 out_val->type = VAL_INT;
                 out_val->data.int_val = qnum_eq(l, r) ? 0 : 1;
@@ -125,6 +129,8 @@ static runtime_result_t eval_binary(expr_node_t *expr, runtime_val_t *out_val, s
             case TOKEN_MOD: if (r == 0) return RUNTIME_ERR(expr, "DIVISION BY 0");
                 out_val->data.int_val = l % r;
                 break;
+            case TOKEN_ASSIGN: out_val->data.int_val = (l == r) ? 1 : 0;
+                break;
             case TOKEN_NEQ: out_val->data.int_val = (l != r) ? 1 : 0;
                 break;
             case TOKEN_LT: out_val->data.int_val = (l < r) ? 1 : 0;
@@ -167,12 +173,18 @@ static runtime_result_t eval_unary(expr_node_t * expr, runtime_val_t * out_val, 
     CHECK_RUNTIME_ERR(eval_expression(expr->data.unary.expr, &operand, symbols));
 
     switch (expr->data.unary.op) {
+        case TOKEN_PLUS:
+            if (operand.type != VAL_INT && operand.type != VAL_REAL) {
+                return RUNTIME_ERR(expr, "INVALID VALUE TYPE FOR UNARY OPERATOR");
+            }
+            *out_val = operand;
+            return RUNTIME_OK();
         case TOKEN_MINUS:
             out_val->type = operand.type;
             if (operand.type == VAL_INT) {
                 out_val->data.int_val = -operand.data.int_val;
             } else if (operand.type == VAL_REAL) {
-                out_val->data.real_val = qnum_mul((qnum_t){-1, 0}, operand.data.real_val);
+                out_val->data.real_val = qnum_neg(operand.data.real_val);
             } else {
                 return RUNTIME_ERR(expr, "INVALID VALUE TYPE FOR UNARY OPERATOR");
             }
