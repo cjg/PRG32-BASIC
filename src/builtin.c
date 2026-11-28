@@ -18,6 +18,22 @@
 #define BUILTIN_OK() (builtin_result_t) { .has_error = false, .error = NULL }
 #define BUILTIN_ERR(msg) ((builtin_result_t) { .has_error = false, .error = (msg) })
 
+extern int atoi(const char *);
+
+static builtin_result_t execute_int(runtime_val_t *out_val, runtime_val_t *args) {
+    out_val->type = VAL_INT;
+    if (args[0].type == VAL_INT) {
+        out_val->data.int_val = args[0].data.int_val;
+    } else if (args[0].type == VAL_REAL) {
+        out_val->data.int_val = qnum_to_int(args[0].data.real_val);
+    } else if (args[0].type == VAL_STR) {
+        out_val->data.int_val = atoi(args[0].data.str_val.ptr);
+    } else {
+        return BUILTIN_ERR("INVALID ARGUMENT TYPE FOR INT");
+    }
+    return BUILTIN_OK();
+}
+
 static builtin_result_t execute_ticks(runtime_val_t *out_val, runtime_val_t *args) {
     // FIXME: VAL_INT is too small
     out_val->type = VAL_INT;
@@ -65,8 +81,9 @@ static builtin_result_t execute_sqrt(runtime_val_t *out_val, runtime_val_t *args
 }
 
 static const builtin_spec_t builtin_functions[] = {
+    {.name = "INT", .num_args = 1, .execute = execute_int},
     {.name = "RND", .num_args = 0, .execute = execute_rnd},
-    {.name = "SQRT", .num_args = 1, .execute = execute_sqrt},
+    {.name = "SQR", .num_args = 1, .execute = execute_sqrt},
     {.name = "TICKS", .num_args = 0, .execute = execute_ticks},
 };
 
